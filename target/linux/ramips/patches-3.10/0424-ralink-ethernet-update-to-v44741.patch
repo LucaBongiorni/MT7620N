@@ -1,0 +1,239 @@
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_ethtool.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_ethtool.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_ethtool.c
+@@ -131,15 +131,39 @@
+ 	return ethtool_op_get_link(dev);
+ }
+ 
++static int fe_set_ringparam(struct net_device *dev,
++		struct ethtool_ringparam *ring)
++{
++	struct fe_priv *priv = netdev_priv(dev);
++
++	if ((ring->tx_pending < 2) ||
++			(ring->rx_pending < 2) ||
++			(ring->rx_pending > MAX_DMA_DESC) ||
++			(ring->tx_pending > MAX_DMA_DESC))
++		return -EINVAL;
++
++	dev->netdev_ops->ndo_stop(dev);
++
++	priv->tx_ring_size = BIT(fls(ring->tx_pending) - 1);
++	priv->rx_ring_size = BIT(fls(ring->rx_pending) - 1);
++
++	dev->netdev_ops->ndo_open(dev);
++
++	return 0;
++}
++
+ static void fe_get_ringparam(struct net_device *dev,
+ 		struct ethtool_ringparam *ring)
+ {
++	struct fe_priv *priv = netdev_priv(dev);
++
+ 	ring->rx_max_pending = MAX_DMA_DESC;
+ 	ring->tx_max_pending = MAX_DMA_DESC;
+-	ring->rx_pending = NUM_DMA_DESC;
+-	ring->tx_pending = NUM_DMA_DESC;
++	ring->rx_pending = priv->rx_ring_size;
++	ring->tx_pending = priv->tx_ring_size;
+ }
+ 
++
+ static void fe_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+ {
+ 	switch (stringset) {
+@@ -194,6 +218,7 @@
+ 	.set_msglevel		= fe_set_msglevel,
+ 	.nway_reset		= fe_nway_reset,
+ 	.get_link		= fe_get_link,
++	.set_ringparam		= fe_set_ringparam,
+ 	.get_ringparam		= fe_get_ringparam,
+ };
+ 
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+@@ -56,8 +56,8 @@
+ 
+ #define TX_DMA_DESP2_DEF	(TX_DMA_LS0 | TX_DMA_DONE)
+ #define TX_DMA_DESP4_DEF	(TX_DMA_QN(3) | TX_DMA_PN(1))
+-#define NEXT_TX_DESP_IDX(X)	(((X) + 1) & (NUM_DMA_DESC - 1))
+-#define NEXT_RX_DESP_IDX(X)	(((X) + 1) & (NUM_DMA_DESC - 1))
++#define NEXT_TX_DESP_IDX(X)	(((X) + 1) & (priv->tx_ring_size - 1))
++#define NEXT_RX_DESP_IDX(X)	(((X) + 1) & (priv->rx_ring_size - 1))
+ 
+ #define SYSC_REG_RSTCTRL	0x34
+ 
+@@ -204,7 +204,7 @@
+ 	int i;
+ 
+ 	if (priv->rx_data) {
+-		for (i = 0; i < NUM_DMA_DESC; i++)
++		for (i = 0; i < priv->tx_ring_size; i++)
+ 			if (priv->rx_data[i]) {
+ 				if (priv->rx_dma && priv->rx_dma[i].rxd1)
+ 					dma_unmap_single(&priv->netdev->dev,
+@@ -220,7 +220,7 @@
+ 
+ 	if (priv->rx_dma) {
+ 		dma_free_coherent(&priv->netdev->dev,
+-				NUM_DMA_DESC * sizeof(*priv->rx_dma),
++				priv->tx_ring_size * sizeof(*priv->rx_dma),
+ 				priv->rx_dma,
+ 				priv->rx_phys);
+ 		priv->rx_dma = NULL;
+@@ -232,19 +232,19 @@
+ 	struct net_device *netdev = priv->netdev;
+ 	int i, pad;
+ 
+-	priv->rx_data = kcalloc(NUM_DMA_DESC, sizeof(*priv->rx_data),
++	priv->rx_data = kcalloc(priv->tx_ring_size, sizeof(*priv->rx_data),
+ 			GFP_KERNEL);
+ 	if (!priv->rx_data)
+ 		goto no_rx_mem;
+ 
+-	for (i = 0; i < NUM_DMA_DESC; i++) {
++	for (i = 0; i < priv->tx_ring_size; i++) {
+ 		priv->rx_data[i] = netdev_alloc_frag(priv->frag_size);
+ 		if (!priv->rx_data[i])
+ 			goto no_rx_mem;
+ 	}
+ 
+ 	priv->rx_dma = dma_alloc_coherent(&netdev->dev,
+-			NUM_DMA_DESC * sizeof(*priv->rx_dma),
++			priv->tx_ring_size * sizeof(*priv->rx_dma),
+ 			&priv->rx_phys,
+ 			GFP_ATOMIC | __GFP_ZERO);
+ 	if (!priv->rx_dma)
+@@ -254,7 +254,7 @@
+ 		pad = 0;
+ 	else
+ 		pad = NET_IP_ALIGN;
+-	for (i = 0; i < NUM_DMA_DESC; i++) {
++	for (i = 0; i < priv->tx_ring_size; i++) {
+ 		dma_addr_t dma_addr = dma_map_single(&netdev->dev,
+ 				priv->rx_data[i] + NET_SKB_PAD + pad,
+ 				priv->rx_buf_size,
+@@ -271,8 +271,8 @@
+ 	wmb();
+ 
+ 	fe_reg_w32(priv->rx_phys, FE_REG_RX_BASE_PTR0);
+-	fe_reg_w32(NUM_DMA_DESC, FE_REG_RX_MAX_CNT0);
+-	fe_reg_w32((NUM_DMA_DESC - 1), FE_REG_RX_CALC_IDX0);
++	fe_reg_w32(priv->tx_ring_size, FE_REG_RX_MAX_CNT0);
++	fe_reg_w32((priv->tx_ring_size - 1), FE_REG_RX_CALC_IDX0);
+ 	fe_reg_w32(FE_PST_DRX_IDX0, FE_REG_PDMA_RST_CFG);
+ 
+ 	return 0;
+@@ -312,7 +312,7 @@
+ 	int i;
+ 
+ 	if (priv->tx_buf) {
+-		for (i = 0; i < NUM_DMA_DESC; i++)
++		for (i = 0; i < priv->tx_ring_size; i++)
+ 			fe_txd_unmap(&priv->netdev->dev, &priv->tx_buf[i]);
+ 		kfree(priv->tx_buf);
+ 		priv->tx_buf = NULL;
+@@ -320,7 +320,7 @@
+ 
+ 	if (priv->tx_dma) {
+ 		dma_free_coherent(&priv->netdev->dev,
+-				NUM_DMA_DESC * sizeof(*priv->tx_dma),
++				priv->tx_ring_size * sizeof(*priv->tx_dma),
+ 				priv->tx_dma,
+ 				priv->tx_phys);
+ 		priv->tx_dma = NULL;
+@@ -333,19 +333,19 @@
+ 
+ 	priv->tx_free_idx = 0;
+ 
+-	priv->tx_buf = kcalloc(NUM_DMA_DESC, sizeof(*priv->tx_buf),
++	priv->tx_buf = kcalloc(priv->tx_ring_size, sizeof(*priv->tx_buf),
+ 			GFP_KERNEL);
+ 	if (!priv->tx_buf)
+ 		goto no_tx_mem;
+ 
+ 	priv->tx_dma = dma_alloc_coherent(&priv->netdev->dev,
+-			NUM_DMA_DESC * sizeof(*priv->tx_dma),
++			priv->tx_ring_size * sizeof(*priv->tx_dma),
+ 			&priv->tx_phys,
+ 			GFP_ATOMIC | __GFP_ZERO);
+ 	if (!priv->tx_dma)
+ 		goto no_tx_mem;
+ 
+-	for (i = 0; i < NUM_DMA_DESC; i++) {
++	for (i = 0; i < priv->tx_ring_size; i++) {
+ 		if (priv->soc->tx_dma) {
+ 			priv->soc->tx_dma(&priv->tx_dma[i]);
+ 		}
+@@ -354,7 +354,7 @@
+ 	wmb();
+ 
+ 	fe_reg_w32(priv->tx_phys, FE_REG_TX_BASE_PTR0);
+-	fe_reg_w32(NUM_DMA_DESC, FE_REG_TX_MAX_CNT0);
++	fe_reg_w32(priv->tx_ring_size, FE_REG_TX_MAX_CNT0);
+ 	fe_reg_w32(0, FE_REG_TX_CTX_IDX0);
+ 	fe_reg_w32(FE_PST_DTX_IDX0, FE_REG_PDMA_RST_CFG);
+ 
+@@ -702,8 +702,8 @@
+ 
+ static inline u32 fe_empty_txd(struct fe_priv *priv, u32 tx_fill_idx)
+ {
+-	return (u32)(NUM_DMA_DESC - ((tx_fill_idx - priv->tx_free_idx) &
+-				(NUM_DMA_DESC - 1)));
++	return (u32)(priv->tx_ring_size - ((tx_fill_idx - priv->tx_free_idx) &
++				(priv->tx_ring_size - 1)));
+ }
+ 
+ static inline int fe_cal_txd_req(struct sk_buff *skb)
+@@ -1484,16 +1484,15 @@
+ 	priv->msg_enable = netif_msg_init(fe_msg_level, FE_DEFAULT_MSG_ENABLE);
+ 	priv->frag_size = fe_max_frag_size(ETH_DATA_LEN);
+ 	priv->rx_buf_size = fe_max_buf_size(priv->frag_size);
+-	if (priv->frag_size > PAGE_SIZE) {
+-		dev_err(&pdev->dev, "error frag size.\n");
+-		err = -EINVAL;
+-		goto err_free_dev;
+-	}
++	priv->tx_ring_size = priv->rx_ring_size = NUM_DMA_DESC;
+ 	INIT_WORK(&priv->pending_work, fe_pending_work);
+ 
+ 	napi_weight = 32;
+-	if (priv->flags & FE_FLAG_NAPI_WEIGHT)
+-		napi_weight = 64;
++	if (priv->flags & FE_FLAG_NAPI_WEIGHT) {
++		napi_weight *= 2;
++		priv->tx_ring_size *= 2;
++		priv->rx_ring_size *= 2;
++	}
+ 	netif_napi_add(netdev, &priv->rx_napi, fe_poll, napi_weight);
+ 	fe_set_ethtool_ops(netdev);
+ 
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+@@ -55,11 +55,7 @@
+ #define FE_DRV_VERSION		"0.1.2"
+ 
+ /* power of 2 to let NEXT_TX_DESP_IDX work */
+-#ifdef CONFIG_SOC_MT7621
+-#define NUM_DMA_DESC		(1 << 9)
+-#else
+ #define NUM_DMA_DESC		(1 << 7)
+-#endif
+ #define MAX_DMA_DESC		0xfff
+ 
+ #define FE_DELAY_EN_INT		0x80
+@@ -487,6 +483,8 @@
+ 	unsigned long			vlan_map;
+ 	struct work_struct		pending_work;
+ 	DECLARE_BITMAP(pending_flags, FE_FLAG_MAX);
++	u16				tx_ring_size;
++	u16				rx_ring_size;
+ };
+ 
+ extern const struct of_device_id of_fe_match[];

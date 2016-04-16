@@ -1,0 +1,96 @@
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+@@ -1231,9 +1231,12 @@
+ 		priv->soc->switch_init(priv);
+ 
+ 	of_get_mac_address_mtd(priv->device->of_node, dev->dev_addr);
+-	/*If the mac address is invalid, use default mac address  */
+-	if (!is_valid_ether_addr(dev->dev_addr))
+-		memcpy(dev->dev_addr, priv->soc->mac, ETH_ALEN);
++	/*If the mac address is invalid, use random mac address  */
++	if (!is_valid_ether_addr(dev->dev_addr)) {
++		random_ether_addr(dev->dev_addr);
++		dev_err(priv->device, "generated random MAC address %pM\n",
++				dev->dev_addr);
++	}	
+ 
+ 	err = fe_mdio_init(priv);
+ 	if (err)
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+@@ -380,7 +380,6 @@
+ 
+ struct fe_soc_data
+ {
+-	unsigned char mac[6];
+ 	const u32 *reg_table;
+ 
+ 	void (*init_data)(struct fe_soc_data *data, struct net_device *netdev);
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
+@@ -229,7 +229,6 @@
+ }
+ 
+ static struct fe_soc_data mt7620_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = mt7620_init_data,
+ 	.reset_fe = mt7620_fe_reset,
+ 	.set_mac = mt7620_set_mac,
+@@ -251,7 +250,6 @@
+ };
+ 
+ static struct fe_soc_data mt7621_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = mt7621_init_data,
+ 	.reset_fe = mt7621_fe_reset,
+ 	.set_mac = mt7621_set_mac,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c
+@@ -57,7 +57,6 @@
+ }
+ 
+ struct fe_soc_data rt2880_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = rt2880_init_data,
+ 	.reset_fe = rt2880_fe_reset,
+ 	.fwd_config = rt2880_fwd_config,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
+@@ -125,7 +125,6 @@
+ }
+ 
+ static struct fe_soc_data rt3050_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = rt305x_init_data,
+ 	.reset_fe = rt305x_fe_reset,
+ 	.fwd_config = rt3050_fwd_config,
+@@ -137,7 +136,6 @@
+ };
+ 
+ static struct fe_soc_data rt5350_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = rt5350_init_data,
+ 	.reg_table = rt5350_reg_table,
+ 	.reset_fe = rt5350_fe_reset,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c
+@@ -56,7 +56,6 @@
+ }
+ 
+ static struct fe_soc_data rt3883_data = {
+-	.mac = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+ 	.init_data = rt3883_init_data,
+ 	.reset_fe = rt3883_fe_reset,
+ 	.fwd_config = rt3883_fwd_config,

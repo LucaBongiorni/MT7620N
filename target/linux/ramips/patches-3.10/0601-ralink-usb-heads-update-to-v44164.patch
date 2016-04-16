@@ -1,0 +1,1669 @@
+Index: linux-3.10.49/include/linux/usb/cdc_ncm.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/cdc_ncm.h
++++ linux-3.10.49/include/linux/usb/cdc_ncm.h
+@@ -36,6 +36,9 @@
+  * SUCH DAMAGE.
+  */
+ 
++#ifndef __LINUX_USB_CDC_NCM_H
++#define __LINUX_USB_CDC_NCM_H
++
+ #define CDC_NCM_COMM_ALTSETTING_NCM		0
+ #define CDC_NCM_COMM_ALTSETTING_MBIM		1
+ 
+@@ -90,17 +93,9 @@
+ 	struct tasklet_struct bh;
+ 
+ 	const struct usb_cdc_ncm_desc *func_desc;
+-	const struct usb_cdc_mbim_desc   *mbim_desc;
+-	const struct usb_cdc_header_desc *header_desc;
+-	const struct usb_cdc_union_desc *union_desc;
++	const struct usb_cdc_mbim_desc *mbim_desc;
+ 	const struct usb_cdc_ether_desc *ether_desc;
+ 
+-	struct net_device *netdev;
+-	struct usb_device *udev;
+-	struct usb_host_endpoint *in_ep;
+-	struct usb_host_endpoint *out_ep;
+-	struct usb_host_endpoint *status_ep;
+-	struct usb_interface *intf;
+ 	struct usb_interface *control;
+ 	struct usb_interface *data;
+ 
+@@ -113,8 +108,6 @@
+ 
+ 	u32 tx_timer_pending;
+ 	u32 tx_curr_frame_num;
+-	u32 rx_speed;
+-	u32 tx_speed;
+ 	u32 rx_max;
+ 	u32 tx_max;
+ 	u32 max_datagram_size;
+@@ -127,9 +120,14 @@
+ 	u16 connected;
+ };
+ 
+-extern u8 cdc_ncm_select_altsetting(struct usbnet *dev, struct usb_interface *intf);
+-extern int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_altsetting);
+-extern void cdc_ncm_unbind(struct usbnet *dev, struct usb_interface *intf);
+-extern struct sk_buff *cdc_ncm_fill_tx_frame(struct cdc_ncm_ctx *ctx, struct sk_buff *skb, __le32 sign);
+-extern int cdc_ncm_rx_verify_nth16(struct cdc_ncm_ctx *ctx, struct sk_buff *skb_in);
+-extern int cdc_ncm_rx_verify_ndp16(struct sk_buff *skb_in, int ndpoffset);
++u8 cdc_ncm_select_altsetting(struct usbnet *dev, struct usb_interface *intf);
++int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_altsetting);
++void cdc_ncm_unbind(struct usbnet *dev, struct usb_interface *intf);
++struct sk_buff *cdc_ncm_fill_tx_frame(struct usbnet *dev, struct sk_buff *skb, __le32 sign);
++int cdc_ncm_rx_verify_nth16(struct cdc_ncm_ctx *ctx, struct sk_buff *skb_in);
++int cdc_ncm_rx_verify_ndp16(struct sk_buff *skb_in, int ndpoffset);
++struct sk_buff *
++cdc_ncm_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags);
++int cdc_ncm_rx_fixup(struct usbnet *dev, struct sk_buff *skb_in);
++
++#endif /* __LINUX_USB_CDC_NCM_H */
+Index: linux-3.10.49/include/linux/usb/chipidea.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/chipidea.h
++++ linux-3.10.49/include/linux/usb/chipidea.h
+@@ -7,32 +7,39 @@
+ 
+ #include <linux/usb/otg.h>
+ 
+-struct ci13xxx;
+-struct ci13xxx_platform_data {
++struct ci_hdrc;
++struct ci_hdrc_platform_data {
+ 	const char	*name;
+ 	/* offset of the capability registers */
+ 	uintptr_t	 capoffset;
+ 	unsigned	 power_budget;
+ 	struct usb_phy	*phy;
++	enum usb_phy_interface phy_mode;
+ 	unsigned long	 flags;
+-#define CI13XXX_REGS_SHARED		BIT(0)
+-#define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+-#define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+-#define CI13XXX_DISABLE_STREAMING	BIT(3)
+-
+-#define CI13XXX_CONTROLLER_RESET_EVENT		0
+-#define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+-	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
++#define CI_HDRC_REGS_SHARED		BIT(0)
++#define CI_HDRC_REQUIRE_TRANSCEIVER	BIT(1)
++#define CI_HDRC_DISABLE_STREAMING	BIT(3)
++	/*
++	 * Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
++	 * but otg is not supported (no register otgsc).
++	 */
++#define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
++#define CI_HDRC_IMX28_WRITE_FIX		BIT(5)
++	enum usb_dr_mode	dr_mode;
++#define CI_HDRC_CONTROLLER_RESET_EVENT		0
++#define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
++	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
++	struct regulator	*reg_vbus;
+ };
+ 
+ /* Default offset of capability registers */
+ #define DEF_CAPOFFSET		0x100
+ 
+-/* Add ci13xxx device */
+-struct platform_device *ci13xxx_add_device(struct device *dev,
++/* Add ci hdrc device */
++struct platform_device *ci_hdrc_add_device(struct device *dev,
+ 			struct resource *res, int nres,
+-			struct ci13xxx_platform_data *platdata);
+-/* Remove ci13xxx device */
+-void ci13xxx_remove_device(struct platform_device *pdev);
++			struct ci_hdrc_platform_data *platdata);
++/* Remove ci hdrc device */
++void ci_hdrc_remove_device(struct platform_device *pdev);
+ 
+ #endif
+Index: linux-3.10.49/include/linux/usb/composite.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/composite.h
++++ linux-3.10.49/include/linux/usb/composite.h
+@@ -468,6 +468,8 @@
+ 	struct config_group group;
+ 	struct list_head cfs_list;
+ 	struct usb_function_driver *fd;
++	int (*set_inst_name)(struct usb_function_instance *inst,
++			      const char *name);
+ 	void (*free_func_inst)(struct usb_function_instance *inst);
+ };
+ 
+Index: linux-3.10.49/include/linux/usb/dwc3-omap.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/dwc3-omap.h
++++ linux-3.10.49/include/linux/usb/dwc3-omap.h
+@@ -1,30 +0,0 @@
+-/*
+- * Copyright (C) 2013 by Texas Instruments
+- *
+- * The Inventra Controller Driver for Linux is free software; you
+- * can redistribute it and/or modify it under the terms of the GNU
+- * General Public License version 2 as published by the Free Software
+- * Foundation.
+- */
+-
+-#ifndef __DWC3_OMAP_H__
+-#define __DWC3_OMAP_H__
+-
+-enum omap_dwc3_vbus_id_status {
+-	OMAP_DWC3_UNKNOWN = 0,
+-	OMAP_DWC3_ID_GROUND,
+-	OMAP_DWC3_ID_FLOAT,
+-	OMAP_DWC3_VBUS_VALID,
+-	OMAP_DWC3_VBUS_OFF,
+-};
+-
+-#if (defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_DWC3_MODULE))
+-extern int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status);
+-#else
+-static inline int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
+-{
+-	return -ENODEV;
+-}
+-#endif
+-
+-#endif	/* __DWC3_OMAP_H__ */
+Index: linux-3.10.49/include/linux/usb/ehci_pdriver.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/ehci_pdriver.h
++++ linux-3.10.49/include/linux/usb/ehci_pdriver.h
+@@ -19,6 +19,9 @@
+ #ifndef __USB_CORE_EHCI_PDRIVER_H
+ #define __USB_CORE_EHCI_PDRIVER_H
+ 
++struct platform_device;
++struct usb_hcd;
++
+ /**
+  * struct usb_ehci_pdata - platform_data for generic ehci driver
+  *
+@@ -51,6 +54,7 @@
+ 	/* Turn on only VBUS suspend power and hotplug detection,
+ 	 * turn off everything else */
+ 	void (*power_suspend)(struct platform_device *pdev);
++	int (*pre_setup)(struct usb_hcd *hcd);
+ };
+ 
+ #endif /* __USB_CORE_EHCI_PDRIVER_H */
+Index: linux-3.10.49/include/linux/usb/functionfs.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/functionfs.h
++++ linux-3.10.49/include/linux/usb/functionfs.h
+@@ -3,34 +3,4 @@
+ 
+ #include <uapi/linux/usb/functionfs.h>
+ 
+-
+-struct ffs_data;
+-struct usb_composite_dev;
+-struct usb_configuration;
+-
+-
+-static int  functionfs_init(void) __attribute__((warn_unused_result));
+-static void functionfs_cleanup(void);
+-
+-static int functionfs_bind(struct ffs_data *ffs, struct usb_composite_dev *cdev)
+-	__attribute__((warn_unused_result, nonnull));
+-static void functionfs_unbind(struct ffs_data *ffs)
+-	__attribute__((nonnull));
+-
+-static int functionfs_bind_config(struct usb_composite_dev *cdev,
+-				  struct usb_configuration *c,
+-				  struct ffs_data *ffs)
+-	__attribute__((warn_unused_result, nonnull));
+-
+-
+-static int functionfs_ready_callback(struct ffs_data *ffs)
+-	__attribute__((warn_unused_result, nonnull));
+-static void functionfs_closed_callback(struct ffs_data *ffs)
+-	__attribute__((nonnull));
+-static void *functionfs_acquire_dev_callback(const char *dev_name)
+-	__attribute__((warn_unused_result, nonnull));
+-static void functionfs_release_dev_callback(struct ffs_data *ffs_data)
+-	__attribute__((nonnull));
+-
+-
+ #endif
+Index: linux-3.10.49/include/linux/usb/gadget.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/gadget.h
++++ linux-3.10.49/include/linux/usb/gadget.h
+@@ -22,6 +22,7 @@
+ #include <linux/slab.h>
+ #include <linux/scatterlist.h>
+ #include <linux/types.h>
++#include <linux/workqueue.h>
+ #include <linux/usb/ch9.h>
+ 
+ struct usb_ep;
+@@ -147,6 +148,9 @@
+  * @maxpacket:The maximum packet size used on this endpoint.  The initial
+  *	value can sometimes be reduced (hardware allowing), according to
+  *      the endpoint descriptor used to configure the endpoint.
++ * @maxpacket_limit:The maximum packet size value which can be handled by this
++ *	endpoint. It's set once by UDC driver when endpoint is initialized, and
++ *	should not be changed. Should not be confused with maxpacket.
+  * @max_streams: The maximum number of streams supported
+  *	by this EP (0 - 16, actual number is 2^n)
+  * @mult: multiplier, 'mult' value for SS Isoc EPs
+@@ -170,6 +174,7 @@
+ 	const struct usb_ep_ops	*ops;
+ 	struct list_head	ep_list;
+ 	unsigned		maxpacket:16;
++	unsigned		maxpacket_limit:16;
+ 	unsigned		max_streams:16;
+ 	unsigned		mult:2;
+ 	unsigned		maxburst:5;
+@@ -181,6 +186,21 @@
+ /*-------------------------------------------------------------------------*/
+ 
+ /**
++ * usb_ep_set_maxpacket_limit - set maximum packet size limit for endpoint
++ * @ep:the endpoint being configured
++ * @maxpacket_limit:value of maximum packet size limit
++ *
++ * This function shoud be used only in UDC drivers to initialize endpoint
++ * (usually in probe function).
++ */
++static inline void usb_ep_set_maxpacket_limit(struct usb_ep *ep,
++					      unsigned maxpacket_limit)
++{
++	ep->maxpacket_limit = maxpacket_limit;
++	ep->maxpacket = maxpacket_limit;
++}
++
++/**
+  * usb_ep_enable - configure endpoint, making it usable
+  * @ep:the endpoint being configured.  may not be the endpoint named "ep0".
+  *	drivers discover endpoints through the ep_list of a usb_gadget.
+@@ -475,6 +495,7 @@
+ 
+ /**
+  * struct usb_gadget - represents a usb slave device
++ * @work: (internal use) Workqueue to be used for sysfs_notify()
+  * @ops: Function pointers used to access hardware-specific operations.
+  * @ep0: Endpoint zero, used when reading or writing responses to
+  *	driver setup() requests
+@@ -483,6 +504,11 @@
+  * @max_speed: Maximal speed the UDC can handle.  UDC must support this
+  *      and all slower speeds.
+  * @state: the state we are now (attached, suspended, configured, etc)
++ * @name: Identifies the controller hardware type.  Used in diagnostics
++ *	and sometimes configuration.
++ * @dev: Driver model state for this abstract device.
++ * @out_epnum: last used out ep number
++ * @in_epnum: last used in ep number
+  * @sg_supported: true if we can handle scatter-gather
+  * @is_otg: True if the USB device port uses a Mini-AB jack, so that the
+  *	gadget driver must provide a USB OTG descriptor.
+@@ -495,11 +521,8 @@
+  *	only supports HNP on a different root port.
+  * @b_hnp_enable: OTG device feature flag, indicating that the A-Host
+  *	enabled HNP support.
+- * @name: Identifies the controller hardware type.  Used in diagnostics
+- *	and sometimes configuration.
+- * @dev: Driver model state for this abstract device.
+- * @out_epnum: last used out ep number
+- * @in_epnum: last used in ep number
++ * @quirk_ep_out_aligned_size: epout requires buffer size to be aligned to
++ *	MaxPacketSize.
+  *
+  * Gadgets have a mostly-portable "gadget driver" implementing device
+  * functions, handling all usb configurations and interfaces.  Gadget
+@@ -520,6 +543,7 @@
+  * device is acting as a B-Peripheral (so is_a_peripheral is false).
+  */
+ struct usb_gadget {
++	struct work_struct		work;
+ 	/* readonly to gadget driver */
+ 	const struct usb_gadget_ops	*ops;
+ 	struct usb_ep			*ep0;
+@@ -527,17 +551,20 @@
+ 	enum usb_device_speed		speed;
+ 	enum usb_device_speed		max_speed;
+ 	enum usb_device_state		state;
++	const char			*name;
++	struct device			dev;
++	unsigned			out_epnum;
++	unsigned			in_epnum;
++
+ 	unsigned			sg_supported:1;
+ 	unsigned			is_otg:1;
+ 	unsigned			is_a_peripheral:1;
+ 	unsigned			b_hnp_enable:1;
+ 	unsigned			a_hnp_support:1;
+ 	unsigned			a_alt_hnp_support:1;
+-	const char			*name;
+-	struct device			dev;
+-	unsigned			out_epnum;
+-	unsigned			in_epnum;
++	unsigned			quirk_ep_out_aligned_size:1;
+ };
++#define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))
+ 
+ static inline void set_gadget_data(struct usb_gadget *gadget, void *data)
+ 	{ dev_set_drvdata(&gadget->dev, data); }
+@@ -554,6 +581,23 @@
+ 
+ 
+ /**
++ * usb_ep_align_maybe - returns @len aligned to ep's maxpacketsize if gadget
++ *	requires quirk_ep_out_aligned_size, otherwise reguens len.
++ * @g: controller to check for quirk
++ * @ep: the endpoint whose maxpacketsize is used to align @len
++ * @len: buffer size's length to align to @ep's maxpacketsize
++ *
++ * This helper is used in case it's required for any reason to check and maybe
++ * align buffer's size to an ep's maxpacketsize.
++ */
++static inline size_t
++usb_ep_align_maybe(struct usb_gadget *g, struct usb_ep *ep, size_t len)
++{
++	return !g->quirk_ep_out_aligned_size ? len :
++			round_up(len, (size_t)ep->desc->wMaxPacketSize);
++}
++
++/**
+  * gadget_is_dualspeed - return true iff the hardware handles high speed
+  * @g: controller that might support both high and full speeds
+  */
+Index: linux-3.10.49/include/linux/usb/hcd.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/hcd.h
++++ linux-3.10.49/include/linux/usb/hcd.h
+@@ -22,6 +22,7 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/rwsem.h>
++#include <linux/interrupt.h>
+ 
+ #define MAX_TOPO_LEVEL		6
+ 
+@@ -67,6 +68,14 @@
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++struct giveback_urb_bh {
++	bool running;
++	spinlock_t lock;
++	struct list_head  head;
++	struct tasklet_struct bh;
++	struct usb_host_endpoint *completing_ep;
++};
++
+ struct usb_hcd {
+ 
+ 	/*
+@@ -125,6 +134,7 @@
+ 	unsigned		rh_registered:1;/* is root hub registered? */
+ 	unsigned		rh_pollable:1;	/* may we poll the root hub? */
+ 	unsigned		msix_enabled:1;	/* driver has MSI-X enabled? */
++	unsigned		remove_phy:1;	/* auto-remove USB phy */
+ 
+ 	/* The next flag is a stopgap, to be removed when all the HCDs
+ 	 * support the new root-hub polling mechanism. */
+@@ -132,6 +142,7 @@
+ 	unsigned		wireless:1;	/* Wireless USB HCD */
+ 	unsigned		authorized_default:1;
+ 	unsigned		has_tt:1;	/* Integrated TT in root hub */
++	unsigned		amd_resume_bug:1; /* AMD remote wakeup quirk */
+ 
+ 	unsigned int		irq;		/* irq allocated */
+ 	void __iomem		*regs;		/* device memory/io */
+@@ -139,6 +150,9 @@
+ 	resource_size_t		rsrc_len;	/* memory/io resource length */
+ 	unsigned		power_budget;	/* in mA, 0 = no limit */
+ 
++	struct giveback_urb_bh  high_prio_bh;
++	struct giveback_urb_bh  low_prio_bh;
++
+ 	/* bandwidth_mutex should be taken before adding or removing
+ 	 * any new bus bandwidth constraints:
+ 	 *   1. Before adding a configuration for a new device.
+@@ -218,8 +232,10 @@
+ #define	HCD_SHARED	0x0004		/* Two (or more) usb_hcds share HW */
+ #define	HCD_USB11	0x0010		/* USB 1.1 */
+ #define	HCD_USB2	0x0020		/* USB 2.0 */
++#define	HCD_USB25	0x0030		/* Wireless USB 1.0 (USB 2.5)*/
+ #define	HCD_USB3	0x0040		/* USB 3.0 */
+ #define	HCD_MASK	0x0070
++#define	HCD_BH		0x0100		/* URB complete in BH context */
+ 
+ 	/* called to init HCD and root hub */
+ 	int	(*reset) (struct usb_hcd *hcd);
+@@ -337,6 +353,8 @@
+ 	void	(*reset_bandwidth)(struct usb_hcd *, struct usb_device *);
+ 		/* Returns the hardware-chosen device address */
+ 	int	(*address_device)(struct usb_hcd *, struct usb_device *udev);
++		/* prepares the hardware to send commands to the device */
++	int	(*enable_device)(struct usb_hcd *, struct usb_device *udev);
+ 		/* Notifies the HCD after a hub descriptor is fetched.
+ 		 * Will block.
+ 		 */
+@@ -360,6 +378,17 @@
+ 	int	(*find_raw_port_number)(struct usb_hcd *, int);
+ };
+ 
++static inline int hcd_giveback_urb_in_bh(struct usb_hcd *hcd)
++{
++	return hcd->driver->flags & HCD_BH;
++}
++
++static inline bool hcd_periodic_completion_in_progress(struct usb_hcd *hcd,
++		struct usb_host_endpoint *ep)
++{
++	return hcd->high_prio_bh.completing_ep == ep;
++}
++
+ extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);
+ extern int usb_hcd_check_unlink_urb(struct usb_hcd *hcd, struct urb *urb,
+ 		int status);
+@@ -410,6 +439,15 @@
+ extern void usb_hcd_pci_remove(struct pci_dev *dev);
+ extern void usb_hcd_pci_shutdown(struct pci_dev *dev);
+ 
++#ifndef CONFIG_PCI_DISABLE_COMMON_QUIRKS
++extern int usb_hcd_amd_remote_wakeup_quirk(struct pci_dev *dev);
++#else
++static inline int usb_hcd_amd_remote_wakeup_quirk(struct pci_dev *dev)
++{
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_PM
+ extern const struct dev_pm_ops usb_hcd_pci_pm_ops;
+ #endif
+@@ -478,6 +516,7 @@
+ 	struct usb_device	*hub;	/* upstream highspeed hub */
+ 	int			multi;	/* true means one TT per port */
+ 	unsigned		think_time;	/* think time in ns */
++	void			*hcpriv;	/* HCD private data */
+ 
+ 	/* for control/bulk error recovery (CLEAR_TT_BUFFER) */
+ 	spinlock_t		lock;
+@@ -536,9 +575,8 @@
+ 		 * of (7/6 * 8 * bytecount) = 9.33 * bytecount */
+ 		/* bytecount = data payload byte count */
+ 
+-#define NS_TO_US(ns)	((ns + 500L) / 1000L)
+-			/* convert & round nanoseconds to microseconds */
+-
++#define NS_TO_US(ns)	DIV_ROUND_UP(ns, 1000L)
++			/* convert nanoseconds to microseconds, rounding up */
+ 
+ /*
+  * Full/low speed bandwidth allocation constants/support.
+Index: linux-3.10.49/include/linux/usb/intel_mid_otg.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/intel_mid_otg.h
++++ linux-3.10.49/include/linux/usb/intel_mid_otg.h
+@@ -1,180 +0,0 @@
+-/*
+- * Intel MID (Langwell/Penwell) USB OTG Transceiver driver
+- * Copyright (C) 2008 - 2010, Intel Corporation.
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program; if not, write to the Free Software Foundation, Inc.,
+- * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+- *
+- */
+-
+-#ifndef __INTEL_MID_OTG_H
+-#define __INTEL_MID_OTG_H
+-
+-#include <linux/pm.h>
+-#include <linux/usb/otg.h>
+-#include <linux/notifier.h>
+-
+-struct intel_mid_otg_xceiv;
+-
+-/* This is a common data structure for Intel MID platform to
+- * save values of the OTG state machine */
+-struct otg_hsm {
+-	/* Input */
+-	int a_bus_resume;
+-	int a_bus_suspend;
+-	int a_conn;
+-	int a_sess_vld;
+-	int a_srp_det;
+-	int a_vbus_vld;
+-	int b_bus_resume;
+-	int b_bus_suspend;
+-	int b_conn;
+-	int b_se0_srp;
+-	int b_ssend_srp;
+-	int b_sess_end;
+-	int b_sess_vld;
+-	int id;
+-/* id values */
+-#define ID_B		0x05
+-#define ID_A		0x04
+-#define ID_ACA_C	0x03
+-#define ID_ACA_B	0x02
+-#define ID_ACA_A	0x01
+-	int power_up;
+-	int adp_change;
+-	int test_device;
+-
+-	/* Internal variables */
+-	int a_set_b_hnp_en;
+-	int b_srp_done;
+-	int b_hnp_enable;
+-	int hnp_poll_enable;
+-
+-	/* Timeout indicator for timers */
+-	int a_wait_vrise_tmout;
+-	int a_wait_bcon_tmout;
+-	int a_aidl_bdis_tmout;
+-	int a_bidl_adis_tmout;
+-	int a_bidl_adis_tmr;
+-	int a_wait_vfall_tmout;
+-	int b_ase0_brst_tmout;
+-	int b_bus_suspend_tmout;
+-	int b_srp_init_tmout;
+-	int b_srp_fail_tmout;
+-	int b_srp_fail_tmr;
+-	int b_adp_sense_tmout;
+-
+-	/* Informative variables */
+-	int a_bus_drop;
+-	int a_bus_req;
+-	int a_clr_err;
+-	int b_bus_req;
+-	int a_suspend_req;
+-	int b_bus_suspend_vld;
+-
+-	/* Output */
+-	int drv_vbus;
+-	int loc_conn;
+-	int loc_sof;
+-
+-	/* Others */
+-	int vbus_srp_up;
+-};
+-
+-/* must provide ULPI access function to read/write registers implemented in
+- * ULPI address space */
+-struct iotg_ulpi_access_ops {
+-	int	(*read)(struct intel_mid_otg_xceiv *iotg, u8 reg, u8 *val);
+-	int	(*write)(struct intel_mid_otg_xceiv *iotg, u8 reg, u8 val);
+-};
+-
+-#define OTG_A_DEVICE	0x0
+-#define OTG_B_DEVICE	0x1
+-
+-/*
+- * the Intel MID (Langwell/Penwell) otg transceiver driver needs to interact
+- * with device and host drivers to implement the USB OTG related feature. More
+- * function members are added based on usb_phy data structure for this
+- * purpose.
+- */
+-struct intel_mid_otg_xceiv {
+-	struct usb_phy		otg;
+-	struct otg_hsm		hsm;
+-
+-	/* base address */
+-	void __iomem		*base;
+-
+-	/* ops to access ulpi */
+-	struct iotg_ulpi_access_ops	ulpi_ops;
+-
+-	/* atomic notifier for interrupt context */
+-	struct atomic_notifier_head	iotg_notifier;
+-
+-	/* start/stop USB Host function */
+-	int	(*start_host)(struct intel_mid_otg_xceiv *iotg);
+-	int	(*stop_host)(struct intel_mid_otg_xceiv *iotg);
+-
+-	/* start/stop USB Peripheral function */
+-	int	(*start_peripheral)(struct intel_mid_otg_xceiv *iotg);
+-	int	(*stop_peripheral)(struct intel_mid_otg_xceiv *iotg);
+-
+-	/* start/stop ADP sense/probe function */
+-	int	(*set_adp_probe)(struct intel_mid_otg_xceiv *iotg,
+-					bool enabled, int dev);
+-	int	(*set_adp_sense)(struct intel_mid_otg_xceiv *iotg,
+-					bool enabled);
+-
+-#ifdef CONFIG_PM
+-	/* suspend/resume USB host function */
+-	int	(*suspend_host)(struct intel_mid_otg_xceiv *iotg,
+-					pm_message_t message);
+-	int	(*resume_host)(struct intel_mid_otg_xceiv *iotg);
+-
+-	int	(*suspend_peripheral)(struct intel_mid_otg_xceiv *iotg,
+-					pm_message_t message);
+-	int	(*resume_peripheral)(struct intel_mid_otg_xceiv *iotg);
+-#endif
+-
+-};
+-static inline
+-struct intel_mid_otg_xceiv *otg_to_mid_xceiv(struct usb_phy *otg)
+-{
+-	return container_of(otg, struct intel_mid_otg_xceiv, otg);
+-}
+-
+-#define MID_OTG_NOTIFY_CONNECT		0x0001
+-#define MID_OTG_NOTIFY_DISCONN		0x0002
+-#define MID_OTG_NOTIFY_HSUSPEND		0x0003
+-#define MID_OTG_NOTIFY_HRESUME		0x0004
+-#define MID_OTG_NOTIFY_CSUSPEND		0x0005
+-#define MID_OTG_NOTIFY_CRESUME		0x0006
+-#define MID_OTG_NOTIFY_HOSTADD		0x0007
+-#define MID_OTG_NOTIFY_HOSTREMOVE	0x0008
+-#define MID_OTG_NOTIFY_CLIENTADD	0x0009
+-#define MID_OTG_NOTIFY_CLIENTREMOVE	0x000a
+-
+-static inline int
+-intel_mid_otg_register_notifier(struct intel_mid_otg_xceiv *iotg,
+-				struct notifier_block *nb)
+-{
+-	return atomic_notifier_chain_register(&iotg->iotg_notifier, nb);
+-}
+-
+-static inline void
+-intel_mid_otg_unregister_notifier(struct intel_mid_otg_xceiv *iotg,
+-				struct notifier_block *nb)
+-{
+-	atomic_notifier_chain_unregister(&iotg->iotg_notifier, nb);
+-}
+-
+-#endif /* __INTEL_MID_OTG_H */
+Index: linux-3.10.49/include/linux/usb/msm_hsusb.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/msm_hsusb.h
++++ linux-3.10.49/include/linux/usb/msm_hsusb.h
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/usb/otg.h>
++#include <linux/clk.h>
+ 
+ /**
+  * Supported USB modes
+@@ -135,6 +136,8 @@
+ 	enum msm_usb_phy_type phy_type;
+ 	void (*setup_gpio)(enum usb_otg_state state);
+ 	char *pclk_src_name;
++	int (*link_clk_reset)(struct clk *link_clk, bool assert);
++	int (*phy_clk_reset)(struct clk *phy_clk);
+ };
+ 
+ /**
+Index: linux-3.10.49/include/linux/usb/musb.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/musb.h
++++ linux-3.10.49/include/linux/usb/musb.h
+@@ -76,6 +76,9 @@
+ 	unsigned	dma:1 __deprecated; /* supports DMA */
+ 	unsigned	vendor_req:1 __deprecated; /* vendor registers required */
+ 
++	/* need to explicitly de-assert the port reset after resume? */
++	unsigned	host_port_deassert_reset_at_resume:1;
++
+ 	u8		num_eps;	/* number of endpoints _with_ ep0 */
+ 	u8		dma_channels __deprecated; /* number of dma channels */
+ 	u8		dyn_fifo_size;	/* dynamic size in bytes */
+@@ -99,8 +102,6 @@
+ 	/* MUSB_HOST, MUSB_PERIPHERAL, or MUSB_OTG */
+ 	u8		mode;
+ 
+-	u8		has_mailbox:1;
+-
+ 	/* for clk_get() */
+ 	const char	*clock;
+ 
+Index: linux-3.10.49/include/linux/usb/nop-usb-xceiv.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/nop-usb-xceiv.h
++++ linux-3.10.49/include/linux/usb/nop-usb-xceiv.h
+@@ -1,29 +0,0 @@
+-#ifndef __LINUX_USB_NOP_XCEIV_H
+-#define __LINUX_USB_NOP_XCEIV_H
+-
+-#include <linux/usb/otg.h>
+-
+-struct nop_usb_xceiv_platform_data {
+-	enum usb_phy_type type;
+-	unsigned long clk_rate;
+-
+-	/* if set fails with -EPROBE_DEFER if can't get regulator */
+-	unsigned int needs_vcc:1;
+-	unsigned int needs_reset:1;
+-};
+-
+-#if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
+-/* sometimes transceivers are accessed only through e.g. ULPI */
+-extern void usb_nop_xceiv_register(void);
+-extern void usb_nop_xceiv_unregister(void);
+-#else
+-static inline void usb_nop_xceiv_register(void)
+-{
+-}
+-
+-static inline void usb_nop_xceiv_unregister(void)
+-{
+-}
+-#endif
+-
+-#endif /* __LINUX_USB_NOP_XCEIV_H */
+Index: linux-3.10.49/include/linux/usb/of.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/of.h
++++ linux-3.10.49/include/linux/usb/of.h
+@@ -0,0 +1,40 @@
++/*
++ * OF helpers for usb devices.
++ *
++ * This file is released under the GPLv2
++ */
++
++#ifndef __LINUX_USB_OF_H
++#define __LINUX_USB_OF_H
++
++#include <linux/usb/ch9.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/phy.h>
++
++#if IS_ENABLED(CONFIG_OF)
++enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np);
++enum usb_device_speed of_usb_get_maximum_speed(struct device_node *np);
++#else
++static inline enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
++{
++	return USB_DR_MODE_UNKNOWN;
++}
++
++static inline enum usb_device_speed
++of_usb_get_maximum_speed(struct device_node *np)
++{
++	return USB_SPEED_UNKNOWN;
++}
++#endif
++
++#if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
++enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
++#else
++static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
++{
++	return USBPHY_INTERFACE_MODE_UNKNOWN;
++}
++
++#endif
++
++#endif /* __LINUX_USB_OF_H */
+Index: linux-3.10.49/include/linux/usb/omap_control_usb.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/omap_control_usb.h
++++ linux-3.10.49/include/linux/usb/omap_control_usb.h
+@@ -19,20 +19,24 @@
+ #ifndef __OMAP_CONTROL_USB_H__
+ #define __OMAP_CONTROL_USB_H__
+ 
++enum omap_control_usb_type {
++	OMAP_CTRL_TYPE_OTGHS = 1,	/* Mailbox OTGHS_CONTROL */
++	OMAP_CTRL_TYPE_USB2,	/* USB2_PHY, power down in CONTROL_DEV_CONF */
++	OMAP_CTRL_TYPE_PIPE3,	/* PIPE3 PHY, DPLL & seperate Rx/Tx power */
++	OMAP_CTRL_TYPE_DRA7USB2, /* USB2 PHY, power and power_aux e.g. DRA7 */
++	OMAP_CTRL_TYPE_AM437USB2, /* USB2 PHY, power e.g. AM437x */
++};
++
+ struct omap_control_usb {
+ 	struct device *dev;
+ 
+-	u32 __iomem *dev_conf;
+ 	u32 __iomem *otghs_control;
+-	u32 __iomem *phy_power;
++	u32 __iomem *power;
++	u32 __iomem *power_aux;
+ 
+ 	struct clk *sys_clk;
+ 
+-	u32 type;
+-};
+-
+-struct omap_control_usb_platform_data {
+-	u8 type;
++	enum omap_control_usb_type type;
+ };
+ 
+ enum omap_control_usb_mode {
+@@ -42,10 +46,6 @@
+ 	USB_MODE_DISCONNECT,
+ };
+ 
+-/* To differentiate ctrl module IP having either mailbox or USB3 PHY power */
+-#define	OMAP_CTRL_DEV_TYPE1		0x1
+-#define	OMAP_CTRL_DEV_TYPE2		0x2
+-
+ #define	OMAP_CTRL_DEV_PHY_PD		BIT(0)
+ 
+ #define	OMAP_CTRL_DEV_AVALID		BIT(0)
+@@ -63,26 +63,23 @@
+ #define	OMAP_CTRL_USB3_PHY_TX_RX_POWERON	0x3
+ #define	OMAP_CTRL_USB3_PHY_TX_RX_POWEROFF	0x0
+ 
++#define OMAP_CTRL_USB2_PHY_PD		BIT(28)
++
++#define AM437X_CTRL_USB2_PHY_PD		BIT(0)
++#define AM437X_CTRL_USB2_OTG_PD		BIT(1)
++#define AM437X_CTRL_USB2_OTGVDET_EN	BIT(19)
++#define AM437X_CTRL_USB2_OTGSESSEND_EN	BIT(20)
++
+ #if IS_ENABLED(CONFIG_OMAP_CONTROL_USB)
+-extern struct device *omap_get_control_dev(void);
+ extern void omap_control_usb_phy_power(struct device *dev, int on);
+-extern void omap_control_usb3_phy_power(struct device *dev, bool on);
+ extern void omap_control_usb_set_mode(struct device *dev,
+ 	enum omap_control_usb_mode mode);
+ #else
+-static inline struct device *omap_get_control_dev(void)
+-{
+-	return ERR_PTR(-ENODEV);
+-}
+ 
+ static inline void omap_control_usb_phy_power(struct device *dev, int on)
+ {
+ }
+ 
+-static inline void omap_control_usb3_phy_power(struct device *dev, int on)
+-{
+-}
+-
+ static inline void omap_control_usb_set_mode(struct device *dev,
+ 	enum omap_control_usb_mode mode)
+ {
+Index: linux-3.10.49/include/linux/usb/otg-fsm.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/otg-fsm.h
++++ linux-3.10.49/include/linux/usb/otg-fsm.h
+@@ -0,0 +1,244 @@
++/* Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the  GNU General Public License along
++ * with this program; if not, write  to the Free Software Foundation, Inc.,
++ * 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifndef __LINUX_USB_OTG_FSM_H
++#define __LINUX_USB_OTG_FSM_H
++
++#include <linux/mutex.h>
++#include <linux/errno.h>
++
++#undef VERBOSE
++
++#ifdef VERBOSE
++#define VDBG(fmt, args...) pr_debug("[%s]  " fmt , \
++				 __func__, ## args)
++#else
++#define VDBG(stuff...)	do {} while (0)
++#endif
++
++#ifdef VERBOSE
++#define MPC_LOC printk("Current Location [%s]:[%d]\n", __FILE__, __LINE__)
++#else
++#define MPC_LOC do {} while (0)
++#endif
++
++#define PROTO_UNDEF	(0)
++#define PROTO_HOST	(1)
++#define PROTO_GADGET	(2)
++
++enum otg_fsm_timer {
++	/* Standard OTG timers */
++	A_WAIT_VRISE,
++	A_WAIT_VFALL,
++	A_WAIT_BCON,
++	A_AIDL_BDIS,
++	B_ASE0_BRST,
++	A_BIDL_ADIS,
++
++	/* Auxiliary timers */
++	B_SE0_SRP,
++	B_SRP_FAIL,
++	A_WAIT_ENUM,
++
++	NUM_OTG_FSM_TIMERS,
++};
++
++/* OTG state machine according to the OTG spec */
++struct otg_fsm {
++	/* Input */
++	int id;
++	int adp_change;
++	int power_up;
++	int test_device;
++	int a_bus_drop;
++	int a_bus_req;
++	int a_srp_det;
++	int a_vbus_vld;
++	int b_conn;
++	int a_bus_resume;
++	int a_bus_suspend;
++	int a_conn;
++	int b_bus_req;
++	int b_se0_srp;
++	int b_ssend_srp;
++	int b_sess_vld;
++	/* Auxilary inputs */
++	int a_sess_vld;
++	int b_bus_resume;
++	int b_bus_suspend;
++
++	/* Output */
++	int data_pulse;
++	int drv_vbus;
++	int loc_conn;
++	int loc_sof;
++	int adp_prb;
++	int adp_sns;
++
++	/* Internal variables */
++	int a_set_b_hnp_en;
++	int b_srp_done;
++	int b_hnp_enable;
++	int a_clr_err;
++
++	/* Informative variables */
++	int a_bus_drop_inf;
++	int a_bus_req_inf;
++	int a_clr_err_inf;
++	int b_bus_req_inf;
++	/* Auxilary informative variables */
++	int a_suspend_req_inf;
++
++	/* Timeout indicator for timers */
++	int a_wait_vrise_tmout;
++	int a_wait_vfall_tmout;
++	int a_wait_bcon_tmout;
++	int a_aidl_bdis_tmout;
++	int b_ase0_brst_tmout;
++	int a_bidl_adis_tmout;
++
++	struct otg_fsm_ops *ops;
++	struct usb_otg *otg;
++
++	/* Current usb protocol used: 0:undefine; 1:host; 2:client */
++	int protocol;
++	struct mutex lock;
++};
++
++struct otg_fsm_ops {
++	void	(*chrg_vbus)(struct otg_fsm *fsm, int on);
++	void	(*drv_vbus)(struct otg_fsm *fsm, int on);
++	void	(*loc_conn)(struct otg_fsm *fsm, int on);
++	void	(*loc_sof)(struct otg_fsm *fsm, int on);
++	void	(*start_pulse)(struct otg_fsm *fsm);
++	void	(*start_adp_prb)(struct otg_fsm *fsm);
++	void	(*start_adp_sns)(struct otg_fsm *fsm);
++	void	(*add_timer)(struct otg_fsm *fsm, enum otg_fsm_timer timer);
++	void	(*del_timer)(struct otg_fsm *fsm, enum otg_fsm_timer timer);
++	int	(*start_host)(struct otg_fsm *fsm, int on);
++	int	(*start_gadget)(struct otg_fsm *fsm, int on);
++};
++
++
++static inline int otg_chrg_vbus(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->chrg_vbus)
++		return -EOPNOTSUPP;
++	fsm->ops->chrg_vbus(fsm, on);
++	return 0;
++}
++
++static inline int otg_drv_vbus(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->drv_vbus)
++		return -EOPNOTSUPP;
++	if (fsm->drv_vbus != on) {
++		fsm->drv_vbus = on;
++		fsm->ops->drv_vbus(fsm, on);
++	}
++	return 0;
++}
++
++static inline int otg_loc_conn(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->loc_conn)
++		return -EOPNOTSUPP;
++	if (fsm->loc_conn != on) {
++		fsm->loc_conn = on;
++		fsm->ops->loc_conn(fsm, on);
++	}
++	return 0;
++}
++
++static inline int otg_loc_sof(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->loc_sof)
++		return -EOPNOTSUPP;
++	if (fsm->loc_sof != on) {
++		fsm->loc_sof = on;
++		fsm->ops->loc_sof(fsm, on);
++	}
++	return 0;
++}
++
++static inline int otg_start_pulse(struct otg_fsm *fsm)
++{
++	if (!fsm->ops->start_pulse)
++		return -EOPNOTSUPP;
++	if (!fsm->data_pulse) {
++		fsm->data_pulse = 1;
++		fsm->ops->start_pulse(fsm);
++	}
++	return 0;
++}
++
++static inline int otg_start_adp_prb(struct otg_fsm *fsm)
++{
++	if (!fsm->ops->start_adp_prb)
++		return -EOPNOTSUPP;
++	if (!fsm->adp_prb) {
++		fsm->adp_sns = 0;
++		fsm->adp_prb = 1;
++		fsm->ops->start_adp_prb(fsm);
++	}
++	return 0;
++}
++
++static inline int otg_start_adp_sns(struct otg_fsm *fsm)
++{
++	if (!fsm->ops->start_adp_sns)
++		return -EOPNOTSUPP;
++	if (!fsm->adp_sns) {
++		fsm->adp_sns = 1;
++		fsm->ops->start_adp_sns(fsm);
++	}
++	return 0;
++}
++
++static inline int otg_add_timer(struct otg_fsm *fsm, enum otg_fsm_timer timer)
++{
++	if (!fsm->ops->add_timer)
++		return -EOPNOTSUPP;
++	fsm->ops->add_timer(fsm, timer);
++	return 0;
++}
++
++static inline int otg_del_timer(struct otg_fsm *fsm, enum otg_fsm_timer timer)
++{
++	if (!fsm->ops->del_timer)
++		return -EOPNOTSUPP;
++	fsm->ops->del_timer(fsm, timer);
++	return 0;
++}
++
++static inline int otg_start_host(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->start_host)
++		return -EOPNOTSUPP;
++	return fsm->ops->start_host(fsm, on);
++}
++
++static inline int otg_start_gadget(struct otg_fsm *fsm, int on)
++{
++	if (!fsm->ops->start_gadget)
++		return -EOPNOTSUPP;
++	return fsm->ops->start_gadget(fsm, on);
++}
++
++int otg_statemachine(struct otg_fsm *fsm);
++
++#endif /* __LINUX_USB_OTG_FSM_H */
+Index: linux-3.10.49/include/linux/usb/otg.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/otg.h
++++ linux-3.10.49/include/linux/usb/otg.h
+@@ -92,4 +92,11 @@
+ /* for OTG controller drivers (and maybe other stuff) */
+ extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
+ 
++enum usb_dr_mode {
++	USB_DR_MODE_UNKNOWN,
++	USB_DR_MODE_HOST,
++	USB_DR_MODE_PERIPHERAL,
++	USB_DR_MODE_OTG,
++};
++
+ #endif /* __LINUX_USB_OTG_H */
+Index: linux-3.10.49/include/linux/usb/phy.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/phy.h
++++ linux-3.10.49/include/linux/usb/phy.h
+@@ -12,6 +12,15 @@
+ #include <linux/notifier.h>
+ #include <linux/usb.h>
+ 
++enum usb_phy_interface {
++	USBPHY_INTERFACE_MODE_UNKNOWN,
++	USBPHY_INTERFACE_MODE_UTMI,
++	USBPHY_INTERFACE_MODE_UTMIW,
++	USBPHY_INTERFACE_MODE_ULPI,
++	USBPHY_INTERFACE_MODE_SERIAL,
++	USBPHY_INTERFACE_MODE_HSIC,
++};
++
+ enum usb_phy_events {
+ 	USB_EVENT_NONE,         /* no events or cable disconnected */
+ 	USB_EVENT_VBUS,         /* vbus valid event */
+@@ -133,7 +142,7 @@
+ /* helpers for direct access thru low-level io interface */
+ static inline int usb_phy_io_read(struct usb_phy *x, u32 reg)
+ {
+-	if (x->io_ops && x->io_ops->read)
++	if (x && x->io_ops && x->io_ops->read)
+ 		return x->io_ops->read(x, reg);
+ 
+ 	return -EINVAL;
+@@ -141,7 +150,7 @@
+ 
+ static inline int usb_phy_io_write(struct usb_phy *x, u32 val, u32 reg)
+ {
+-	if (x->io_ops && x->io_ops->write)
++	if (x && x->io_ops && x->io_ops->write)
+ 		return x->io_ops->write(x, val, reg);
+ 
+ 	return -EINVAL;
+@@ -150,7 +159,7 @@
+ static inline int
+ usb_phy_init(struct usb_phy *x)
+ {
+-	if (x->init)
++	if (x && x->init)
+ 		return x->init(x);
+ 
+ 	return 0;
+@@ -159,14 +168,14 @@
+ static inline void
+ usb_phy_shutdown(struct usb_phy *x)
+ {
+-	if (x->shutdown)
++	if (x && x->shutdown)
+ 		x->shutdown(x);
+ }
+ 
+ static inline int
+ usb_phy_vbus_on(struct usb_phy *x)
+ {
+-	if (!x->set_vbus)
++	if (!x || !x->set_vbus)
+ 		return 0;
+ 
+ 	return x->set_vbus(x, true);
+@@ -175,7 +184,7 @@
+ static inline int
+ usb_phy_vbus_off(struct usb_phy *x)
+ {
+-	if (!x->set_vbus)
++	if (!x || !x->set_vbus)
+ 		return 0;
+ 
+ 	return x->set_vbus(x, false);
+@@ -249,7 +258,7 @@
+ static inline int
+ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+ {
+-	if (x->set_suspend != NULL)
++	if (x && x->set_suspend != NULL)
+ 		return x->set_suspend(x, suspend);
+ 	else
+ 		return 0;
+@@ -258,7 +267,7 @@
+ static inline int
+ usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
+ {
+-	if (x->notify_connect)
++	if (x && x->notify_connect)
+ 		return x->notify_connect(x, speed);
+ 	else
+ 		return 0;
+@@ -267,7 +276,7 @@
+ static inline int
+ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
+ {
+-	if (x->notify_disconnect)
++	if (x && x->notify_disconnect)
+ 		return x->notify_disconnect(x, speed);
+ 	else
+ 		return 0;
+Index: linux-3.10.49/include/linux/usb/quirks.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/quirks.h
++++ linux-3.10.49/include/linux/usb/quirks.h
+@@ -30,4 +30,10 @@
+    descriptor */
+ #define USB_QUIRK_DELAY_INIT		0x00000040
+ 
++/* device generates spurious wakeup, ignore remote wakeup capability */
++#define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
++
++/* device can't handle device_qualifier descriptor requests */
++#define USB_QUIRK_DEVICE_QUALIFIER	0x00000100
++
+ #endif /* __LINUX_USB_QUIRKS_H */
+Index: linux-3.10.49/include/linux/usb/serial.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/serial.h
++++ linux-3.10.49/include/linux/usb/serial.h
+@@ -19,10 +19,6 @@
+ #include <linux/sysrq.h>
+ #include <linux/kfifo.h>
+ 
+-#define SERIAL_TTY_MAJOR	188	/* Nice legal number now */
+-#define SERIAL_TTY_MINORS	254	/* loads of devices :) */
+-#define SERIAL_TTY_NO_MINOR	255	/* No minor was assigned */
+-
+ /* The maximum number of ports one device can grab at once */
+ #define MAX_NUM_PORTS		8
+ 
+@@ -37,7 +33,8 @@
+  * @serial: pointer back to the struct usb_serial owner of this port.
+  * @port: pointer to the corresponding tty_port for this port.
+  * @lock: spinlock to grab when updating portions of this structure.
+- * @number: the number of the port (the minor number).
++ * @minor: the minor number of the port
++ * @port_number: the struct usb_serial port number of this port (starts at 0)
+  * @interrupt_in_buffer: pointer to the interrupt in buffer for this port.
+  * @interrupt_in_urb: pointer to the interrupt in struct urb for this port.
+  * @interrupt_in_endpointAddress: endpoint address for the interrupt in pipe
+@@ -80,7 +77,8 @@
+ 	struct usb_serial	*serial;
+ 	struct tty_port		port;
+ 	spinlock_t		lock;
+-	unsigned char		number;
++	u32			minor;
++	u8			port_number;
+ 
+ 	unsigned char		*interrupt_in_buffer;
+ 	struct urb		*interrupt_in_urb;
+@@ -140,7 +138,6 @@
+  * @dev: pointer to the struct usb_device for this device
+  * @type: pointer to the struct usb_serial_driver for this device
+  * @interface: pointer to the struct usb_interface for this device
+- * @minor: the starting minor number for this device
+  * @num_ports: the number of ports this device has
+  * @num_interrupt_in: number of interrupt in endpoints we have
+  * @num_interrupt_out: number of interrupt out endpoints we have
+@@ -159,7 +156,7 @@
+ 	unsigned char			disconnected:1;
+ 	unsigned char			suspending:1;
+ 	unsigned char			attached:1;
+-	unsigned char			minor;
++	unsigned char			minors_reserved:1;
+ 	unsigned char			num_ports;
+ 	unsigned char			num_port_pointers;
+ 	char				num_interrupt_in;
+@@ -319,10 +316,12 @@
+ #endif
+ 
+ /* Functions needed by other parts of the usbserial core */
+-extern struct usb_serial *usb_serial_get_by_index(unsigned int minor);
++extern struct usb_serial_port *usb_serial_port_get_by_minor(unsigned int minor);
+ extern void usb_serial_put(struct usb_serial *serial);
+ extern int usb_serial_generic_open(struct tty_struct *tty,
+ 	struct usb_serial_port *port);
++extern int usb_serial_generic_write_start(struct usb_serial_port *port,
++							gfp_t mem_flags);
+ extern int usb_serial_generic_write(struct tty_struct *tty,
+ 	struct usb_serial_port *port, const unsigned char *buf, int count);
+ extern void usb_serial_generic_close(struct usb_serial_port *port);
+Index: linux-3.10.49/include/linux/usb/tegra_usb_phy.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/tegra_usb_phy.h
++++ linux-3.10.49/include/linux/usb/tegra_usb_phy.h
+@@ -18,19 +18,36 @@
+ #include <linux/clk.h>
+ #include <linux/usb/otg.h>
+ 
++/*
++ * utmi_pll_config_in_car_module: true if the UTMI PLL configuration registers
++ *     should be set up by clk-tegra, false if by the PHY code
++ * has_hostpc: true if the USB controller has the HOSTPC extension, which
++ *     changes the location of the PHCD and PTS fields
++ * requires_usbmode_setup: true if the USBMODE register needs to be set to
++ *      enter host mode
++ * requires_extra_tuning_parameters: true if xcvr_hsslew, hssquelch_level
++ *      and hsdiscon_level should be set for adequate signal quality
++ */
++
++struct tegra_phy_soc_config {
++	bool utmi_pll_config_in_car_module;
++	bool has_hostpc;
++	bool requires_usbmode_setup;
++	bool requires_extra_tuning_parameters;
++};
++
+ struct tegra_utmip_config {
+ 	u8 hssync_start_delay;
+ 	u8 elastic_limit;
+ 	u8 idle_wait_delay;
+ 	u8 term_range_adj;
++	bool xcvr_setup_use_fuses;
+ 	u8 xcvr_setup;
+ 	u8 xcvr_lsfslew;
+ 	u8 xcvr_lsrslew;
+-};
+-
+-struct tegra_ulpi_config {
+-	int reset_gpio;
+-	const char *clk;
++	u8 xcvr_hsslew;
++	u8 hssquelch_level;
++	u8 hsdiscon_level;
+ };
+ 
+ enum tegra_usb_phy_port_speed {
+@@ -39,11 +56,6 @@
+ 	TEGRA_USB_PHY_PORT_SPEED_HIGH,
+ };
+ 
+-enum tegra_usb_phy_mode {
+-	TEGRA_USB_PHY_MODE_DEVICE,
+-	TEGRA_USB_PHY_MODE_HOST,
+-};
+-
+ struct tegra_xtal_freq;
+ 
+ struct tegra_usb_phy {
+@@ -54,22 +66,17 @@
+ 	struct clk *clk;
+ 	struct clk *pll_u;
+ 	struct clk *pad_clk;
+-	enum tegra_usb_phy_mode mode;
++	struct regulator *vbus;
++	enum usb_dr_mode mode;
+ 	void *config;
++	const struct tegra_phy_soc_config *soc_config;
+ 	struct usb_phy *ulpi;
+ 	struct usb_phy u_phy;
+-	struct device *dev;
+ 	bool is_legacy_phy;
+ 	bool is_ulpi_phy;
+-	void (*set_pts)(struct usb_phy *x, u8 pts_val);
+-	void (*set_phcd)(struct usb_phy *x, bool enable);
++	int reset_gpio;
+ };
+ 
+-struct tegra_usb_phy *tegra_usb_phy_open(struct device *dev, int instance,
+-	void __iomem *regs, void *config, enum tegra_usb_phy_mode phy_mode,
+-	void (*set_pts)(struct usb_phy *x, u8 pts_val),
+-	void (*set_phcd)(struct usb_phy *x, bool enable));
+-
+ void tegra_usb_phy_preresume(struct usb_phy *phy);
+ 
+ void tegra_usb_phy_postresume(struct usb_phy *phy);
+Index: linux-3.10.49/include/linux/usb/usbnet.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/usbnet.h
++++ linux-3.10.49/include/linux/usb/usbnet.h
+@@ -34,12 +34,15 @@
+ 	struct mutex		phy_mutex;
+ 	unsigned char		suspend_count;
+ 	unsigned char		pkt_cnt, pkt_err;
++	unsigned short		rx_qlen, tx_qlen;
++	unsigned		can_dma_sg:1;
+ 
+ 	/* i/o info: pipes etc */
+ 	unsigned		in, out;
+ 	struct usb_host_endpoint *status;
+ 	unsigned		maxpacket;
+ 	struct timer_list	delay;
++	const char		*padding_pkt;
+ 
+ 	/* protocol/interface state */
+ 	struct net_device	*net;
+@@ -253,4 +256,6 @@
+ extern int usbnet_status_start(struct usbnet *dev, gfp_t mem_flags);
+ extern void usbnet_status_stop(struct usbnet *dev);
+ 
++extern void usbnet_update_max_qlen(struct usbnet *dev);
++
+ #endif /* __LINUX_USB_USBNET_H */
+Index: linux-3.10.49/include/linux/usb/usb_phy_gen_xceiv.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/usb_phy_gen_xceiv.h
++++ linux-3.10.49/include/linux/usb/usb_phy_gen_xceiv.h
+@@ -0,0 +1,30 @@
++#ifndef __LINUX_USB_NOP_XCEIV_H
++#define __LINUX_USB_NOP_XCEIV_H
++
++#include <linux/usb/otg.h>
++
++struct usb_phy_gen_xceiv_platform_data {
++	enum usb_phy_type type;
++	unsigned long clk_rate;
++
++	/* if set fails with -EPROBE_DEFER if can't get regulator */
++	unsigned int needs_vcc:1;
++	unsigned int needs_reset:1;	/* deprecated */
++	int gpio_reset;
++};
++
++#if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
++/* sometimes transceivers are accessed only through e.g. ULPI */
++extern void usb_nop_xceiv_register(void);
++extern void usb_nop_xceiv_unregister(void);
++#else
++static inline void usb_nop_xceiv_register(void)
++{
++}
++
++static inline void usb_nop_xceiv_unregister(void)
++{
++}
++#endif
++
++#endif /* __LINUX_USB_NOP_XCEIV_H */
+Index: linux-3.10.49/include/linux/usb/wusb.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/wusb.h
++++ linux-3.10.49/include/linux/usb/wusb.h
+@@ -271,6 +271,8 @@
+ #define WUSB_KEY_INDEX_TYPE_GTK			2
+ #define WUSB_KEY_INDEX_ORIGINATOR_HOST		0
+ #define WUSB_KEY_INDEX_ORIGINATOR_DEVICE	1
++/* bits 0-3 used for the key index. */
++#define WUSB_KEY_INDEX_MAX			15
+ 
+ /* A CCM Nonce, defined in WUSB1.0[6.4.1] */
+ struct aes_ccm_nonce {
+Index: linux-3.10.49/include/linux/usb/wusb-wa.h
+===================================================================
+--- linux-3.10.49/include/linux/usb/wusb-wa.h
++++ linux-3.10.49/include/linux/usb/wusb-wa.h
+@@ -66,6 +66,7 @@
+ 	WA_ENABLE = 0x01,
+ 	WA_RESET = 0x02,
+ 	RPIPE_PAUSE = 0x1,
++	RPIPE_STALL = 0x2,
+ };
+ 
+ /* Responses from Get Status request ([WUSB] section 8.3.1.6) */
+@@ -92,11 +93,20 @@
+ 	__le16  wRPipeIndex;
+ 	__le16	wRequests;
+ 	__le16	wBlocks;		/* rw if 0 */
+-	__le16	wMaxPacketSize;		/* rw? */
+-	u8	bHSHubAddress;		/* reserved: 0 */
+-	u8	bHSHubPort;		/* ??? FIXME ??? */
++	__le16	wMaxPacketSize;		/* rw */
++	union {
++		u8	dwa_bHSHubAddress;		/* rw: DWA. */
++		u8	hwa_bMaxBurst;			/* rw: HWA. */
++	};
++	union {
++		u8	dwa_bHSHubPort;		/*  rw: DWA. */
++		u8	hwa_bDeviceInfoIndex;	/*  rw: HWA. */
++	};
+ 	u8	bSpeed;			/* rw: xfer rate 'enum uwb_phy_rate' */
+-	u8	bDeviceAddress;		/* rw: Target device address */
++	union {
++		u8 dwa_bDeviceAddress;	/* rw: DWA Target device address. */
++		u8 hwa_reserved;		/* rw: HWA. */
++	};
+ 	u8	bEndpointAddress;	/* rw: Target EP address */
+ 	u8	bDataSequence;		/* ro: Current Data sequence */
+ 	__le32	dwCurrentWindow;	/* ro */
+@@ -132,7 +142,7 @@
+ struct wa_notif_hdr {
+ 	u8 bLength;
+ 	u8 bNotifyType;			/* enum wa_notif_type */
+-} __attribute__((packed));
++} __packed;
+ 
+ /**
+  * HWA DN Received notification [(WUSB] section 8.5.4.2)
+@@ -148,7 +158,7 @@
+ 	u8 bSourceDeviceAddr;		/* from errata 2005/07 */
+ 	u8 bmAttributes;
+ 	struct wusb_dn_hdr dndata[];
+-} __attribute__((packed));
++} __packed;
+ 
+ /* [WUSB] section 8.3.3 */
+ enum wa_xfer_type {
+@@ -157,6 +167,8 @@
+ 	WA_XFER_TYPE_ISO = 0x82,
+ 	WA_XFER_RESULT = 0x83,
+ 	WA_XFER_ABORT = 0x84,
++	WA_XFER_ISO_PACKET_INFO = 0xA0,
++	WA_XFER_ISO_PACKET_STATUS = 0xA1,
+ };
+ 
+ /* [WUSB] section 8.3.3 */
+@@ -167,28 +179,47 @@
+ 	__le32 dwTransferID;		/* Host-assigned ID */
+ 	__le32 dwTransferLength;	/* Length of data to xfer */
+ 	u8 bTransferSegment;
+-} __attribute__((packed));
++} __packed;
+ 
+ struct wa_xfer_ctl {
+ 	struct wa_xfer_hdr hdr;
+ 	u8 bmAttribute;
+ 	__le16 wReserved;
+ 	struct usb_ctrlrequest baSetupData;
+-} __attribute__((packed));
++} __packed;
+ 
+ struct wa_xfer_bi {
+ 	struct wa_xfer_hdr hdr;
+ 	u8 bReserved;
+ 	__le16 wReserved;
+-} __attribute__((packed));
++} __packed;
+ 
++/* [WUSB] section 8.5.5 */
+ struct wa_xfer_hwaiso {
+ 	struct wa_xfer_hdr hdr;
+ 	u8 bReserved;
+ 	__le16 wPresentationTime;
+ 	__le32 dwNumOfPackets;
+-	/* FIXME: u8 pktdata[]? */
+-} __attribute__((packed));
++} __packed;
++
++struct wa_xfer_packet_info_hwaiso {
++	__le16 wLength;
++	u8 bPacketType;
++	u8 bReserved;
++	__le16 PacketLength[0];
++} __packed;
++
++struct wa_xfer_packet_status_len_hwaiso {
++	__le16 PacketLength;
++	__le16 PacketStatus;
++} __packed;
++
++struct wa_xfer_packet_status_hwaiso {
++	__le16 wLength;
++	u8 bPacketType;
++	u8 bReserved;
++	struct wa_xfer_packet_status_len_hwaiso PacketStatus[0];
++} __packed;
+ 
+ /* [WUSB] section 8.3.3.5 */
+ struct wa_xfer_abort {
+@@ -196,7 +227,7 @@
+ 	u8 bRequestType;
+ 	__le16 wRPipe;			/* RPipe index */
+ 	__le32 dwTransferID;		/* Host-assigned ID */
+-} __attribute__((packed));
++} __packed;
+ 
+ /**
+  * WA Transfer Complete notification ([WUSB] section 8.3.3.3)
+@@ -206,7 +237,7 @@
+ 	struct wa_notif_hdr hdr;
+ 	u8 bEndpoint;
+ 	u8 Reserved;
+-} __attribute__((packed));
++} __packed;
+ 
+ /** Transfer result basic codes [WUSB] table 8-15 */
+ enum {
+@@ -233,7 +264,7 @@
+ 	u8     bTransferSegment;
+ 	u8     bTransferStatus;
+ 	__le32 dwNumOfPackets;
+-} __attribute__((packed));
++} __packed;
+ 
+ /**
+  * Wire Adapter Class Descriptor ([WUSB] section 8.5.2.7).
+@@ -248,16 +279,16 @@
+ struct usb_wa_descriptor {
+ 	u8	bLength;
+ 	u8	bDescriptorType;
+-	u16	bcdWAVersion;
++	__le16	bcdWAVersion;
+ 	u8	bNumPorts;		/* don't use!! */
+ 	u8	bmAttributes;		/* Reserved == 0 */
+-	u16	wNumRPipes;
+-	u16	wRPipeMaxBlock;
++	__le16	wNumRPipes;
++	__le16	wRPipeMaxBlock;
+ 	u8	bRPipeBlockSize;
+ 	u8	bPwrOn2PwrGood;
+ 	u8	bNumMMCIEs;
+ 	u8	DeviceRemovable;	/* FIXME: in DWA this is up to 16 bytes */
+-} __attribute__((packed));
++} __packed;
+ 
+ /**
+  * HWA Device Information Buffer (WUSB1.0[T8.54])
+@@ -267,6 +298,6 @@
+ 	u8	bDeviceAddress;
+ 	__le16	wPHYRates;
+ 	u8	bmDeviceAttribute;
+-} __attribute__((packed));
++} __packed;
+ 
+ #endif /* #ifndef __LINUX_USB_WUSB_WA_H */

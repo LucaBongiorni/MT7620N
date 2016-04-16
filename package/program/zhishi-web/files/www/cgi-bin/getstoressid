@@ -1,0 +1,11 @@
+#!/bin/sh
+#We don't understand the license things, so let it go.
+#Please don't do evil to us.
+#v2015-1-10 qizha/wangke/noel/summer
+
+echo "Content-Type: application/json"
+echo ""
+echo "{"
+uci show apcli0 | grep '.ssid=' | awk -F "=" '{print "\""$2"\":\"1\","}' 2>/dev/null
+echo '"[__EOF]":"0"'
+echo "}"

@@ -1,0 +1,35 @@
+#!/bin/sh
+#We don't understand the license things, so let it go.
+#Please don't do evil to us.
+#v2015-1-10 qizha/wangke/noel/summer
+
+if [ -n "$QUERY_STRING" ]; then
+	echo "Content-Type: application/json"
+	echo ""
+	firstexp=`echo $QUERY_STRING | cut -d'&' -f 1`
+	firstkey=`echo $firstexp | cut -d'=' -f 1`
+	ussid=`echo $firstexp | cut -d'=' -f 2`
+	ussid=$(printf $(echo -n $ussid | sed 's/\\/\\\\/g;s/\(%\)\([0-9a-fA-F][0-9a-fA-F]\)/\\x\2/g')"\n")
+elif [ "$1" ]; then
+	echo "wireless-WAN tool - to delete the stored ap"
+    	ussid=$1
+elif [ -n "$HTTP_HOST" ]; then
+	echo "Content-Type: application/json"
+	echo ""
+	echo "{\"result\":\"error\",\"message\":\"pls input ssid with QUERY_STRING\"}"
+    	exit 2
+else
+    	echo "wireless-WAN tool"
+	echo "Pls specify stored ssid, use this tool like: delapcli stored-ssid"
+    	exit 2
+fi
+
+kk=$(uci show apcli0 | grep '.ssid=' |  grep "$ussid")
+if [ ! "$kk" ]; then
+	echo "{\"result\":\"error\",\"message\":\"The $ussid ssid didn't stored\"}"
+	exit 5
+fi
+uci delete "${kk%.*}"
+uci commit &
+
+echo "{\"result\":\"success\",\"message\":\"The $ussid deleted from stored APs.\"}""

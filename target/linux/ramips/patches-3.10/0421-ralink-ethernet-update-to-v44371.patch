@@ -1,0 +1,154 @@
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c      2015-09-25 10:18:34.373158870 +0800
+@@ -923,27 +923,34 @@
+ 	struct fe_priv *priv = container_of(napi, struct fe_priv, rx_napi);
+ 	struct fe_hw_stats *hwstat = priv->hw_stats;
+ 	int tx_done, rx_done;
+-	u32 status, mask;
+-	u32 tx_intr, rx_intr;
++	u32 status, fe_status, status_reg, mask;
++	u32 tx_intr, rx_intr, status_intr;
+ 
+-	status = fe_reg_r32(FE_REG_FE_INT_STATUS);
++	fe_status = status = fe_reg_r32(FE_REG_FE_INT_STATUS);
+ 	tx_intr = priv->soc->tx_int;
+ 	rx_intr = priv->soc->rx_int;
++	status_intr = priv->soc->status_int;
+ 	tx_done = rx_done = 0;
+ 
++	if (fe_reg_table[FE_REG_FE_INT_STATUS2]) {
++		fe_status = fe_reg_r32(FE_REG_FE_INT_STATUS2);
++		status_reg = FE_REG_FE_INT_STATUS2;
++	} else
++		status_reg = FE_REG_FE_INT_STATUS;
++
+ 	if (status & tx_intr)
+ 		tx_done = fe_poll_tx(priv, budget, tx_intr);
+ 
+ 	if (status & rx_intr)
+ 		rx_done = fe_poll_rx(napi, budget, priv, rx_intr);
+ 
+-	if (unlikely(hwstat && (status & FE_CNT_GDM_AF))) {
+-		if (spin_trylock(&hwstat->stats_lock)) {
++	if (unlikely(fe_status & status_intr)) {
++		if (hwstat && spin_trylock(&hwstat->stats_lock)) {
+ 			fe_stats_update(priv);
+ 			spin_unlock(&hwstat->stats_lock);
+ 		}
+-		fe_reg_w32(FE_CNT_GDM_AF, FE_REG_FE_INT_STATUS);
+-	}
++		fe_reg_w32(status_intr, status_reg);
++	}	
+ 
+ 	if (unlikely(netif_msg_intr(priv))) {
+ 		mask = fe_reg_r32(FE_REG_FE_INT_ENABLE);
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h      2015-09-25 10:18:34.373158870 +0800
+@@ -43,6 +43,7 @@
+ 	FE_REG_FE_DMA_VID_BASE,
+ 	FE_REG_FE_COUNTER_BASE,
+ 	FE_REG_FE_RST_GL,
++	FE_REG_FE_INT_STATUS2,
+ 	FE_REG_COUNT
+ };
+ 
+@@ -401,6 +402,7 @@
+ 	u32 pdma_glo_cfg;
+ 	u32 rx_int;
+ 	u32 tx_int;
++	u32 status_int;
+ 	u32 checksum_bit;
+ };
+ 
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c      2015-09-25 10:18:34.373158870 +0800
+@@ -62,6 +62,15 @@
+ #define GSW_REG_GDMA1_MAC_ADRH	0x50C
+ 
+ #define MT7621_FE_RST_GL	(FE_FE_OFFSET + 0x04)
++#define MT7620_FE_INT_STATUS2	(FE_FE_OFFSET + 0x08)
++
++/*
++ * FE_INT_STATUS reg on mt7620 define CNT_GDM1_AF at BIT(29)
++ * but after test it should be BIT(13).
++ */
++#define MT7620_FE_GDM1_AF	BIT(13)
++#define MT7621_FE_GDM1_AF	BIT(28)
++#define MT7621_FE_GDM2_AF	BIT(29)
+ 
+ static const u32 mt7620_reg_table[FE_REG_COUNT] = {
+ 	[FE_REG_PDMA_GLO_CFG] = RT5350_PDMA_GLO_CFG,
+@@ -80,6 +89,7 @@
+ 	[FE_REG_FE_DMA_VID_BASE] = MT7620_DMA_VID,
+ 	[FE_REG_FE_COUNTER_BASE] = MT7620_GDM1_TX_GBCNT,
+ 	[FE_REG_FE_RST_GL] = MT7621_FE_RST_GL,
++	[FE_REG_FE_INT_STATUS2] = MT7620_FE_INT_STATUS2,
+ };
+ 
+ static const u32 mt7621_reg_table[FE_REG_COUNT] = {
+@@ -99,6 +109,7 @@
+ 	[FE_REG_FE_DMA_VID_BASE] = 0,
+ 	[FE_REG_FE_COUNTER_BASE] = MT7621_GDM1_TX_GBCNT,
+ 	[FE_REG_FE_RST_GL] = MT7621_FE_RST_GL,
++	[FE_REG_FE_INT_STATUS2] = MT7620_FE_INT_STATUS2,
+ };
+ 
+ static void mt7620_fe_reset(void)
+@@ -231,6 +242,7 @@
+ 	.pdma_glo_cfg = FE_PDMA_SIZE_16DWORDS,
+ 	.rx_int = RT5350_RX_DONE_INT,
+ 	.tx_int = RT5350_TX_DONE_INT,
++	.status_int = MT7620_FE_GDM1_AF,
+ 	.checksum_bit = MT7620_L4_VALID,
+ 	.has_carrier = mt7620a_has_carrier,
+ 	.mdio_read = mt7620_mdio_read,
+@@ -251,6 +263,7 @@
+ 	.pdma_glo_cfg = FE_PDMA_SIZE_16DWORDS,
+ 	.rx_int = RT5350_RX_DONE_INT,
+ 	.tx_int = RT5350_TX_DONE_INT,
++	.status_int = (MT7621_FE_GDM1_AF | MT7621_FE_GDM2_AF),
+ 	.checksum_bit = MT7621_L4_VALID,
+ 	.has_carrier = mt7620a_has_carrier,
+ 	.mdio_read = mt7620_mdio_read,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt2880.c      2015-09-25 10:18:34.373158870 +0800
+@@ -65,6 +65,7 @@
+ 	.checksum_bit = RX_DMA_L4VALID,
+ 	.rx_int = FE_RX_DONE_INT,
+ 	.tx_int = FE_TX_DONE_INT,
++	.status_int = FE_CNT_GDM_AF,
+ 	.mdio_read = rt2880_mdio_read,
+ 	.mdio_write = rt2880_mdio_write,
+ 	.mdio_adjust_link = rt2880_mdio_link_adjust,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c      2015-09-25 10:18:34.373158870 +0800
+@@ -133,6 +133,7 @@
+ 	.checksum_bit = RX_DMA_L4VALID,
+ 	.rx_int = FE_RX_DONE_INT,
+ 	.tx_int = FE_TX_DONE_INT,
++	.status_int = FE_CNT_GDM_AF,
+ };
+ 
+ static struct fe_soc_data rt5350_data = {
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c      2015-09-25 12:03:54.635000970 +0800
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt3883.c      2015-09-25 10:18:34.373158870 +0800
+@@ -63,6 +63,7 @@
+ 	.pdma_glo_cfg = FE_PDMA_SIZE_8DWORDS,
+ 	.rx_int = FE_RX_DONE_INT,
+ 	.tx_int = FE_TX_DONE_INT,
++	.status_int = FE_CNT_GDM_AF,
+ 	.checksum_bit = RX_DMA_L4VALID,
+ 	.mdio_read = rt2880_mdio_read,
+ 	.mdio_write = rt2880_mdio_write,

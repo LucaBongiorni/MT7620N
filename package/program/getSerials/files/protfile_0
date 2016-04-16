@@ -1,0 +1,424 @@
+{
+    
+    "comment": "ibeacon 1.0 v8-v9 type_firmware:1.0-2.0",
+    "dev_id_get": 
+    {
+            "type_val": 2,
+            "len_type": 1,
+            "num_val" : 6,
+            "pos_val": 12
+    },
+    
+    
+    "packets":
+    [
+    
+    {
+            "comment": "packet0",
+            "judge_key": 
+            [
+                {
+                    "val_key_static": "0",
+                    "val_key_get": 
+                   
+                        {
+                            "type_val": 2,
+                            "len_type": 1,
+                            "num_val" : 1,
+                            "pos_val": 20
+                        }
+                   
+                }
+            ],
+      
+          
+            "judge_condition": 
+            [
+                {
+                    "judge": 
+                    [
+                        {
+                            "result": 0,
+                            "val_key": 0,
+                            "judge_relation": 3
+                        },
+                        {
+                            "result": 0,
+                            "val_key": 1,
+                            "judge_relation": 3
+                        },
+                        {
+                            "judge_logic": 0
+                        }
+                    ]
+                }
+            ],
+     
+  
+            
+
+  
+           
+            "data_violate": 
+            [
+                {"valid": 1},
+                
+                {
+                    "name": "rssi",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 19
+                }
+         
+            ],
+
+           
+
+
+      
+            "data_static": 
+            [
+                {"valid": 1},
+                {
+                    "name": "adr_ble",
+                    "type_val": 0,     
+                    "len_type": 1,
+                    "num_val" : 6,
+                    "separator":1,
+                    "pos_val": 12
+                },
+                {
+                    "name": "adr_type",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 18
+                },
+
+                {
+                    "name": "uuid",
+                    "type_val": 0,
+                    "len_type": 1,
+                    "num_val" : 16,
+                    "separator":1,
+                    "pos_val": 30
+                },
+
+               {
+                    "name": "major",
+                    "type_val": 0,
+                    "len_type": 1,
+                    "num_val" : 2,
+                    "separator":2,
+                    "pos_val": 46
+                },
+               {
+                    "name": "minor",
+                    "type_val": 0,
+                    "len_type": 1,
+                    "num_val" : 2,
+                    "separator":2,
+                    "pos_val": 48
+                },
+                 {
+                    "name": "mssi",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 50
+                }
+
+
+                
+            ]
+       
+     
+    },
+
+    {
+            "comment": "packet1",
+            "judge_key": 
+            [
+                {
+                    "val_key_static": "1",
+                    "val_key_get": 
+                   
+                        {
+                            "type_val": 2,
+                            "len_type": 1,
+                            "num_val" : 1,
+                            "pos_val": 20
+                        }
+                   
+                },
+                {
+                    "val_key_static": "0a18",
+                    "val_key_get": 
+                    
+                     {
+                            "type_val": 4,
+                            "len_type": 2,
+                            "num_val" : 1,
+                            "pos_val": 23
+                     }
+                    
+                },
+                
+
+                
+                {
+                    "val_key_static": "02",
+                    "val_key_get": 
+                    
+                     {
+                            "type_val": 2,
+                            "len_type": 1,
+                            "num_val" : 2,
+                            "pos_val": 36
+                     }
+                    
+                }
+            ],
+      
+          
+            "judge_condition": 
+            [
+                {
+                    "judge": 
+                    [
+                        {
+                            "result": 0,
+                            "val_key": 1,
+                            "judge_relation": 3
+                        },
+                        {
+                            "result": 0,
+                            "val_key": 2,
+                            "judge_relation": 3
+                        },
+                        {
+                            "judge_logic": 1
+                        }
+                    ]
+                },
+
+                {
+                    "judge": 
+                    [
+                        {
+                            "result": 1,
+                            "val_key": 0,
+                            "judge_relation": 0
+                        },
+                        {
+                            "result": 0,
+                            "val_key": 3,
+                            "judge_relation": 4
+                        },
+                        {
+                            "judge_logic": 1
+                        }
+                    ]
+                }
+
+                
+            ],
+     
+  
+            
+
+  
+           
+            "data_violate": 
+            [
+                {"valid": 0}
+    
+            ],
+
+           
+
+
+      
+            "data_static": 
+            [
+                {"valid": 1},
+                
+                {
+                    "name": "id_beacon",
+                    "type_val": 0,
+                    "len_type": 1,
+                    "num_val" : 2,
+                    "separator":1,
+                    "pos_val": 23
+                },
+                {
+                    "name": "type_firmware",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 36
+                },
+
+                {
+                    "name": "battery_power",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 37
+                },
+                {
+                    "name": "temp_device",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 38
+                },
+                {
+                    "name": "luminance",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 39
+                }
+            ]
+       
+     
+    },
+    {
+            "comment": "packet2",
+            "judge_key": 
+            [
+                {
+                    "val_key_static": "1",
+                    "val_key_get": 
+                   
+                        {
+                            "type_val": 2,
+                            "len_type": 1,
+                            "num_val" : 1,
+                            "pos_val": 20
+                        }
+                   
+                },
+                
+       
+                
+                {
+                    "val_key_static": "09",
+                    "val_key_get": 
+                    
+                     {
+                            "type_val": 2,
+                            "len_type": 1,
+                            "num_val" : 2,
+                            "pos_val": 22
+                     }
+                    
+                }
+            ],
+      
+          
+            "judge_condition": 
+            [
+                {
+                    "judge": 
+                    [
+                        {
+                            "result": 0,
+                            "val_key": 1,
+                            "judge_relation": 3
+                        },
+                        {
+                            "result": 0,
+                            "val_key": 2,
+                            "judge_relation": 3
+                        },
+                        {
+                            "judge_logic": 1
+                        }
+                    ]
+                }
+
+                
+
+                
+            ],
+     
+  
+            
+
+  
+           
+            "data_violate": 
+            [
+                {"valid": 0}
+    
+            ],
+
+           
+
+
+      
+            "data_static": 
+            [
+                {"valid": 0},
+                
+                {
+                    "name": "id_beacon",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 2,
+                    "separator":1,
+                    "pos_val": 23
+                },
+                {
+                    "name": "type_firmware",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 34
+                },
+
+                {
+                    "name": "battery_power",
+                    "type_val": 2,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 35
+                },
+                {
+                    "name": "temp_device",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 36
+                },
+                {
+                    "name": "luminance",
+                    "type_val": 1,
+                    "len_type": 1,
+                    "num_val" : 1,
+                    "separator":0,
+                    "pos_val": 37
+                }
+            ]
+       
+     
+    }
+
+    ]
+  
+    
+}
+    

@@ -1,0 +1,14 @@
+#!/bin/sh
+apcli_status=$(cat /proc/apcli_status)
+if [ apcli_status -eq 1 ]
+then
+	ifconfig apcli0 down
+else
+	ifconfig apcli0 up
+	ifup wan
+fi
+
+echo "Content-Type:text/html"
+echo ""
+echo ""
+echo "ok"

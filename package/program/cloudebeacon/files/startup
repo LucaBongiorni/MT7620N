@@ -1,0 +1,32 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+
+start(){
+	if [ ! -f /etc/.setpassword ] 
+	then
+		cd /etc && touch .setpassword && cd -
+		( echo root; echo root ) | passwd >/dev/null 2>&1	
+	fi
+	
+	#if [ ! -f /usr/ibeacon/conf/ssid.conf ] 
+	#then
+		#sleep 1
+		#cd /usr/ibeacon/bin/ && ./getSerials && cd -
+	#fi
+
+	if [ ! -f /etc/.firstStart ] 
+	then
+		if [ -d /usr/rootdir ]
+		then
+			touch /etc/.firstStart
+			cp -rfpP /usr/rootdir/* /
+			rm -rf /usr/rootdir
+		fi
+	fi
+
+	telnetd &
+	#/bin/sh /usr/ibeacon/tool/guardIbeacon.sh &
+}
+

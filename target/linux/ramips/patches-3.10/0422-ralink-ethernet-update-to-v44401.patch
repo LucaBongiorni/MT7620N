@@ -1,0 +1,14 @@
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+@@ -908,6 +908,9 @@
+ 		if (idx != hwidx)
+ 			goto txpoll_again;
+ 	}
++	
++	if (!done)
++		return 0;
+ 
+ 	netdev_completed_queue(netdev, done, bytes_compl);
+ 	if (unlikely(netif_queue_stopped(netdev) &&

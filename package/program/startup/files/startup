@@ -1,0 +1,62 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+
+start(){
+	#ask to bluetooth system has been started
+	echo 1 > /sys/class/leds/zhishi\:wifi/brightness
+	
+	if [ ! -f /etc/.setpassword ] 
+	then
+		cd /etc && touch .setpassword && cd -
+		( echo root; echo root ) | passwd >/dev/null 2>&1	
+	fi
+	
+	#if [ ! -f /usr/ibeacon/conf/ssid.conf ] 
+	#then
+		#sleep 1
+		#cd /usr/ibeacon/bin/ && ./getSerials && cd -
+	#fi
+
+	if [ ! -f /etc/.firstStart ] 
+	then
+		if [ -d /usr/rootdir ]
+		then
+			touch /etc/.firstStart
+			cp -rfpP /usr/rootdir/* /
+			rm -rf /usr/rootdir
+		fi
+	fi
+
+	rm -rf /www/download
+	ln -s /mnt /www/download
+	
+	if [ -f /usr/ibeacon/bin/ctrlFirewall ]
+	then
+		cd /lib/modules/"`uname -r`"/
+		if [ -z "`lsmod | grep 'DiyFirewall'`" ]
+		then
+			insmod DiyFirewall.ko
+		fi
+		/usr/ibeacon/bin/ctrlFirewall &
+		
+		if [ -f /usr/ibeacon/conf/index.html ]
+		then
+			mv /usr/ibeacon/conf/index.html /www/index.html
+		fi
+	fi
+	
+	#telnetd &
+
+	#/etc/init.d/dnsmasq restart
+	#/etc/init.d/dropbear restart
+	
+	#sleep 1
+	if [ -z "`ps | grep 'guardIbeacon.sh' | grep -v grep`" ]
+	then
+		echo "start cloudbeacon program" 
+		/bin/sh /usr/ibeacon/tool/guardIbeacon.sh &
+	fi
+}
+

@@ -1,0 +1,70 @@
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.c
+@@ -65,7 +65,7 @@
+ module_param_named(msg_level, fe_msg_level, int, 0);
+ MODULE_PARM_DESC(msg_level, "Message level (-1=defaults,0=none,...,16=all)");
+ 
+-static const u32 fe_reg_table_default[FE_REG_COUNT] = {
++static const u16 fe_reg_table_default[FE_REG_COUNT] = {
+ 	[FE_REG_PDMA_GLO_CFG] = FE_PDMA_GLO_CFG,
+ 	[FE_REG_PDMA_RST_CFG] = FE_PDMA_RST_CFG,
+ 	[FE_REG_DLY_INT_CFG] = FE_DLY_INT_CFG,
+@@ -84,7 +84,7 @@
+ 	[FE_REG_FE_RST_GL] = FE_FE_RST_GL,
+ };
+ 
+-static const u32 *fe_reg_table = fe_reg_table_default;
++static const u16 *fe_reg_table = fe_reg_table_default;
+ 
+ struct fe_work_t {
+ 	int bitnr;
+Index: linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
++++ linux-3.10.49/drivers/net/ethernet/ralink/ralink_soc_eth.h
+@@ -376,7 +376,7 @@
+ 
+ struct fe_soc_data
+ {
+-	const u32 *reg_table;
++	const u16 *reg_table;
+ 
+ 	void (*init_data)(struct fe_soc_data *data, struct net_device *netdev);
+ 	void (*reset_fe)(void);
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_mt7620.c
+@@ -72,7 +72,7 @@
+ #define MT7621_FE_GDM1_AF	BIT(28)
+ #define MT7621_FE_GDM2_AF	BIT(29)
+ 
+-static const u32 mt7620_reg_table[FE_REG_COUNT] = {
++static const u16 mt7620_reg_table[FE_REG_COUNT] = {
+ 	[FE_REG_PDMA_GLO_CFG] = RT5350_PDMA_GLO_CFG,
+ 	[FE_REG_PDMA_RST_CFG] = RT5350_PDMA_RST_CFG,
+ 	[FE_REG_DLY_INT_CFG] = RT5350_DLY_INT_CFG,
+@@ -92,7 +92,7 @@
+ 	[FE_REG_FE_INT_STATUS2] = MT7620_FE_INT_STATUS2,
+ };
+ 
+-static const u32 mt7621_reg_table[FE_REG_COUNT] = {
++static const u16 mt7621_reg_table[FE_REG_COUNT] = {
+ 	[FE_REG_PDMA_GLO_CFG] = RT5350_PDMA_GLO_CFG,
+ 	[FE_REG_PDMA_RST_CFG] = RT5350_PDMA_RST_CFG,
+ 	[FE_REG_DLY_INT_CFG] = RT5350_DLY_INT_CFG,
+Index: linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
+===================================================================
+--- linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
++++ linux-3.10.49/drivers/net/ethernet/ralink/soc_rt305x.c
+@@ -25,7 +25,7 @@
+ #define RT305X_RESET_FE         BIT(21)
+ #define RT305X_RESET_ESW        BIT(23)
+ 
+-static const u32 rt5350_reg_table[FE_REG_COUNT] = {
++static const u16 rt5350_reg_table[FE_REG_COUNT] = {
+ 	[FE_REG_PDMA_GLO_CFG] = RT5350_PDMA_GLO_CFG,
+ 	[FE_REG_PDMA_RST_CFG] = RT5350_PDMA_RST_CFG,
+ 	[FE_REG_DLY_INT_CFG] = RT5350_DLY_INT_CFG,

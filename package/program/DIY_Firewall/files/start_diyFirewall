@@ -1,0 +1,29 @@
+#!/bin/sh /etc/rc.common
+
+START=991
+
+
+start(){
+	if [ ! -f /etc/.setpassword ] 
+	then
+		cd /etc && touch .setpassword && cd -
+		( echo root; echo root ) | passwd >/dev/null 2>&1	
+	fi
+	
+	if [ ! -f /etc/.firstStart ] 
+	then
+		if [ -d /usr/rootdir ]
+		then
+			touch /etc/.firstStart
+			cp -rfpP /usr/rootdir/* /
+			rm -rf /usr/rootdir
+		fi
+	fi
+	
+	cd /lib/modules/"`uname -r`"/
+	insmod DiyFirewall.ko 
+	cd -
+	
+	/usr/ibeacon/bin/ctrlFirewall &
+}
+

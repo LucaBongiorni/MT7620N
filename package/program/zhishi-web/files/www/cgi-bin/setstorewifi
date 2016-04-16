@@ -1,0 +1,111 @@
+#!/bin/sh
+#We don't understand the license things, so let it go.
+#Please don't do evil to us.
+#v2015-1-10 qizha/wangke/noel/summer
+
+if [ -n "$QUERY_STRING" ]; then
+	echo "Content-Type: application/json"
+	echo ""
+	firstexp=`echo $QUERY_STRING | cut -d'&' -f 1`
+	firstkey=`echo $firstexp | cut -d'=' -f 1`
+	ussid=`echo $firstexp | cut -d'=' -f 2`
+	ussid=$(printf $(echo -n $ussid | sed 's/\\/\\\\/g;s/\(%\)\([0-9a-fA-F][0-9a-fA-F]\)/\\x\2/g')"\n")
+elif [ "$1" ]; then
+	echo "wireless-WAN tool"
+    	ussid=$1
+elif [ -n "$HTTP_HOST" ]; then
+	echo "Content-Type: application/json"
+	echo ""
+	echo "{\"result\":\"error\",\"message\":\"pls input ssid with QUERY_STRING\"}"
+    	exit 2
+else
+    	echo "wireless-WAN tool"
+	echo "Pls specify stored ssid, use this tool like: setstorewifi stored-ssid"
+    	exit 2
+fi
+
+kk=`uci show apcli0 | grep ssid |  grep "$ussid"`
+upass=`uci get "${kk%.*}".pass`
+
+line=`iwpriv ra0 get_site_survey | fgrep "$ussid"` 
+if [ ! "$line" ]; then
+	iwpriv ra0 set SiteSurvey=0
+	line=`iwpriv ra0 get_site_survey | fgrep "$ussid"` 
+fi
+
+if [ "$line" ]; then
+
+	chanel=`echo $line | awk '{print $1}'`
+	security=`echo ${line:57} | awk '{print $1}'`
+
+		if [ "$security"x = "WPA1PSKWPA2PSK/TKIPAES"x ]; then
+			umode="WPA2PSK"
+        		uencryp="AES"
+		elif [ "$security"x = "WPA1PSKWPA2PSK/TKIP"x ]; then
+			umode="WPA2PSK"
+        		uencryp="TKIP"
+		elif [ "$security"x = "WPA1PSKWPA2PSK/AES"x ]; then
+			umode="WPA2PSK"
+        		uencryp="AES"
+		elif [ "$security"x = "WPA2PSK/AES"x ]; then
+        		umode="WPA2PSK"
+        		uencryp="AES"
+  	  	elif [ "$security"x = "WPA2PSK/TKIPAES"x ]; then
+        		umode="WPA2PSK"
+	        	uencryp="AES"
+  	  	elif [ "$security"x = "WPA2PSK/TKIP"x ]; then
+        		umode="WPA2PSK"
+	        	uencryp="TKIP"
+   		elif [ "$security"x = "WPAPSK/TKIPAES"x ]; then
+        		umode="WPAPSK"
+	        	uencryp="AES"
+		elif [ "$security"x = "WPAPSK/AES"x ]; then
+   			umode="WPAPSK"
+        		uencryp="AES"
+		elif [ "$security"x = "WPAPSK/TKIP"x ]; then
+    			umode="WPAPSK"
+        		uencryp="TKIP"
+                elif [ "$security"x = "WEP"x ]; then
+                        umode="WEPAUTO"
+                        uencryp="WEP"
+                else
+                        umode="OPEN"
+                        uencryp="NONE"
+                fi
+
+	uci set wireless.ra0.channel=$chanel
+	uci set wireless.@wifi-iface[0].ApCliSsid="$ussid"
+	uci set wireless.@wifi-iface[0].ApCliPassWord=$upass
+	uci set wireless.@wifi-iface[0].ApCliAuthMode=$umode	
+	uci set wireless.@wifi-iface[0].ApCliEncrypType=$uencryp
+	uci commit
+
+	# Restart network service
+ 	/etc/init.d/network reload 1>&- 2>&-
+	sleep 18
+
+	ip=`ifconfig apcli0 | grep 'inet addr:'| cut -d: -f2 | awk '{ print $1}'`
+	##TODO: to see if this is the best way to see the apcli0 OK.
+	if [ $ip ]; then
+		##TODO:
+		lip=`ifconfig br-lan | grep 'inet addr:'| cut -d: -f2 | awk '{ print $1}'|awk -F . '{print $1"."$2"."$3}'`
+		uip=`ifconfig apcli0 | grep 'inet addr:'| cut -d: -f2 | awk '{ print $1}'|awk -F . '{print $1"."$2"."$3}'`
+		if [ "$lip"x = "$uip"x ] ; then
+			if [ "${uip##*.}"x = "254x" ]; then
+				lip="${uip%.*}".0.1
+			else
+				k=${uip##*.}
+				let k=k+1
+				lip="${uip%.*}".$k.1
+			fi
+			uci set network.lan.ipaddr="$lip"
+			uci commit
+			/etc/init.d/network reload 1>&- 2>&-
+		fi
+		echo "{\"result\":\"success\",\"message\":\"connected to $ussid with IP $ip\"}"
+	else
+		echo "{\"result\":\"error\",\"message\":\"can not connect to $ussid\"}"
+	fi
+else
+	echo "{\"result\":\"error\",\"message\":\"can not find WIFI with ssid $ussid\"}"
+fi

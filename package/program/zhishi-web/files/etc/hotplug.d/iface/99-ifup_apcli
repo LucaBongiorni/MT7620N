@@ -1,0 +1,45 @@
+#!/bin/sh
+storage=$(cat /tmp/storaged_ssid)
+apcli_status=$(cat /proc/apcli_status)
+
+sleep 3
+#logger $storage
+
+[ "$ACTION" = "ifup" ] && [ "$DEVICE" = "apcli0" ] && [ "$storage" -eq 1 ] && [ "$apcli_status" -eq 1 ] && {
+	ApCliAuthMode=$(uci get wireless.@wifi-iface[0].ApCliAuthMode -q)
+	ApCliSsid=$(uci get wireless.@wifi-iface[0].ApCliSsid -q)
+	ApCliPassWord=$(uci get wireless.@wifi-iface[0].ApCliPassWord -q)
+	ApCliEncrypType=$(uci get wireless.@wifi-iface[0].ApCliEncrypType -q)
+	
+	touch /etc/config/apcli0
+	number=$(uci show apcli0 | grep -x 'apcli0.*=wifi' | wc -l)
+	uci_num=0
+
+	for i in $(seq $number);do
+	let uci_num=$i-1
+	tmp_ssid=$(uci get apcli0.@wifi[$uci_num].ssid -q)
+
+
+	[ "$ApCliSsid"x = "$tmp_ssid"x ] && {
+		uci set apcli0.@wifi[$uci_num].ssid="$ApCliSsid"
+		uci set apcli0.@wifi[$uci_num].auth="$ApCliAuthMode"
+		uci set apcli0.@wifi[$uci_num].enc="$ApCliEncrypType"
+		uci set apcli0.@wifi[$uci_num].pass="$ApCliPassWord"
+		uci commit
+		uci_num=-1
+		break
+	}
+
+	done
+
+	#logger $uci_num
+	
+	[ $uci_num -gt -1 ] && {
+		cfg=$(uci add apcli0 wifi)
+		uci set apcli0.$cfg.ssid="$ApCliSsid"
+		uci set apcli0.$cfg.auth="$ApCliAuthMode"
+		uci set apcli0.$cfg.enc="$ApCliEncrypType"
+		uci set apcli0.$cfg.pass="$ApCliPassWord" 
+		uci commit
+	}	
+}

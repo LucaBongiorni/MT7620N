@@ -1,0 +1,478 @@
+*,html,body{
+	font-family:STHeiti,'Microsoft Yahei',Sans-serif;
+}
+html{
+	width:100%;
+	height:100%;
+}
+body{
+	width:100%;
+	height:100%;
+	background-image: -webkit-gradient(linear, left top,left bottom,from(#104e51), to(#adb671));
+	background-image: -webkit-linear-gradient(top , #104e51, #adb671);
+	background-image: -moz-linear-gradient(top , #104e51, #adb671);
+	background-image: -o-linear-gradient(top , #104e51, #adb671);
+	background-image: -ms-linear-gradient(top , #104e51, #adb671);
+	background-image: linear-gradient(top , #104e51, #adb671);
+	filter: progid:DXImageTransform.Microsoft.Gradient(startColorStr='#104e51',endColorStr='#adb671',gradientType='0'); 
+	background-size:100% 100%;
+	color:#666;
+	font-size:14px;
+}
+a{
+	color:#666;
+}
+
+/*header*/
+#header{
+	position:absolute;
+	left:0;
+	top:0;
+	width:290px;
+	background:#eeeeee;
+	height:100%;
+	z-index:9;
+}
+#header ul,h1{
+	margin-left:37.5%;
+}
+#header ul{
+	margin-top:40px;
+	line-height:36px;
+}
+#header ul li a{
+	padding-left:36px;
+}
+
+#header ul ul{
+	margin-top:0;
+	display: none;
+	-webkit-transition:all .1s linear;
+	-moz-transition:all .1s linear;
+	-trans-transition:all .1s linear;
+	-o-transition:all .1s linear;
+	-ms-transition:all .1s linear;
+	transition:all .1s linear;
+}
+#header ul ul li a{
+	padding-left:0;
+	display: block;
+	line-height: 2em;
+}
+
+.has-menu:hover ul{
+	display: block !important;
+}
+
+
+#link-wifilist{
+	background:url(../images/wifilist.png) 8px no-repeat;
+	background-size:14px 14px;
+}
+#link-mywifi{
+	background:url(../images/mywifi.png) 8px no-repeat;
+	background-size:14px 14px;
+}
+#link-setting{
+	background:url(../images/setting.png) 8px no-repeat;
+	background-size:14px 14px;
+}
+#advanced-setting{
+	background:url(../images/setting.png) 8px no-repeat;
+	background-size:14px 14px;
+}
+#link-help{
+	background:url(../images/help.png) 8px no-repeat;
+	background-size:14px 14px;
+}
+h1{
+	height:65px;
+	margin-top:60px;
+	background:url(../images/logo.png) no-repeat;
+	background-size:auto 60px;
+}
+h1 span{
+	display:none;
+}
+section{
+	position:absolute;
+	width:100%;
+	height:100%;
+	text-align:center;
+}
+.panel{
+	display:none;
+}
+.panel article{
+	background:rgba(255,255,255,.96);
+}
+article{
+	background:#fff;
+	height:auto;
+	width:490px;
+	text-align:left;
+	margin-top: 105px;
+	margin-left:400px;
+}
+article>div{
+	padding:35px 30px;
+}
+
+.panel:target{
+	display:inline-block;
+}
+
+/**wifilist**/
+h2{
+	font-size:18px;
+}
+h2 span{
+	display:block;
+	font-size:12px;
+}
+.listhead{
+	position:relative;
+}
+.listhead h2{
+	float:left;
+}
+.listhead:before{
+	content:"";
+	display:inline-block;
+	width:64px;
+	height:60px;
+	margin-right:20px;
+	vertical-align:middle;
+	float:left;
+	background:url(../images/wifilist-icon.png) 0 0 no-repeat;
+
+}
+.connected{
+	float:right;
+	margin-top:14px;
+}
+.green{
+	color:#5ab646;
+}
+
+.listhead p:after{
+	content:"";
+	display:inline-block;
+	width:30px;
+	height:30px;
+	margin-left:10px;
+	vertical-align:middle;
+	background:url(../images/wifilist-icon.png) -444px -10px no-repeat;
+}
+.searchwifi{
+	position:relative;
+	margin:20px 0;
+}
+.searchwifi input{
+	height:30px;
+	width:260px;
+	padding-left:10px;
+	float:right;
+}
+#submit{
+	border:0;
+	width:30px;
+	background:url(../images/wifilist-icon.png) -444px -114px no-repeat;
+	position:absolute;
+	right:0;
+}
+.wifilist{
+	position:relative;
+}
+.wifilist ul,.mywifi ul{
+	margin-top:8px;
+	border-top:1px solid #c9c9c9;
+	border-bottom:1px solid #c9c9c9;
+	height:300px;
+	overflow:auto;
+}
+.wifilist li,.mywifi li{
+	position:relative;
+	margin:10px 0;
+	padding: 3px;
+}
+.wifilist li a{
+	display: block;
+}
+.wifilist li a:after{
+	content:"";
+	display:inline-block;
+	width:20px;
+	height:20px;
+	position:absolute;
+	right:50px;
+	top:10px;
+	background:url(../images/wifilist-icon.png) -414px -480px no-repeat;
+}
+.mywifi li:hover{
+	background:#d5f3df;
+}
+.mywifi .remove{
+	position:absolute;
+	display:inline-block;
+	width:20px;
+	height:20px;
+	right:14px;
+	top:12px;
+	z-index:4;
+}
+.mywifi li:hover .remove{
+	background:url(../images/remove.png) no-repeat;
+}
+li:after,.note:before{
+	content:"";
+	display:inline-block;
+	width:30px;
+	height:30px;
+	position:absolute;
+	right:10px;
+	top:10px;
+}
+
+li.q1:after,.note:before{
+	background:url(../images/wifilist-icon.png) -444px -219px no-repeat;
+}
+li.q2:after{
+	background:url(../images/wifilist-icon.png) -444px -480px no-repeat;
+}
+li.q3:after{
+	background:url(../images/wifilist-icon.png) -444px -262px no-repeat;
+}
+li.q4:after{
+	background:url(../images/wifilist-icon.png) -444px -219px no-repeat;
+}
+.wificontent{
+	font-size:12px;
+}
+.btn{
+	display:inline-block;
+	width:90px;
+	border:1px solid #666;
+	text-align:center;
+	line-height:28px;
+	background:#fff;
+}
+a.btn:hover,input.btn:enabled:hover{
+	background: #5ab646;
+	color: #fff !important;
+	border-color:#5ab646 !important;
+}
+.closewifi .btn{float:right;}
+.mywifihead{
+	line-height:28px;
+}
+.mywifihead p span{
+	display:inline-block;
+	margin:0 8px;
+}
+.mywifi>p,.wifilist>p,.mywifi label{
+	font-size:12px;
+}
+.mywifi form{
+	margin-top:6px;
+}
+#autoadded{
+	-webkit-appearance: inherit;
+	width:12px;
+	height:12px;
+	background:url(../images/checkbox.png) 0 -14px no-repeat;
+}
+#autoadded:checked{
+	background:url(../images/checkbox.png) 0 0 no-repeat;
+}
+.form{
+}
+.form h2{
+	margin: 1em 0;
+}
+.form>div,.form>p{
+	margin-bottom:10px;
+}
+.form label{
+	display:inline-block;
+	width:8em;
+	text-align:right;
+}
+.form input{
+	width:240px;
+	height:32px;
+	padding:0 15px;
+	border:1px solid #ccc;
+}
+.setting-actions{
+	text-align:right;
+}
+.setting-actions input{
+	width:90px;
+	height:30px;
+	margin:20px 10px;
+}
+/*select*/
+.selectContainer{position:relative; background:#fff;width: 240px; padding: 0 15px;display:inline-block;border:1px solid #ccc;vertical-align: middle;} 
+.selectContainer .selectOption{min-width: 100%; display: block;line-height:32px; height:32px;
+ white-space:nowrap; overflow:hidden;border:none; z-index:1000} 
+.selectOption em{font-size:12px;}
+.selectContainer .shows{width: 32px; height:22px; position:absolute; right:0; top:5px;
+background:url(../images/xia.png) no-repeat center;background-size:55% auto;} 
+.selectContainer ul{position:absolute; width: 100%; top:33px; left:-1px; display:none;border: 1px solid #ccc;border-top:0;} 
+.selectContainer.active{}
+.selectContainer ul li{box-sizing:border-box;padding: 0 15px; line-height: 32px; width: 100%; background: #fff; cursor:pointer} 
+.selectContainer ul li:hover{background:#d5f3df} 
+.selectContainer ul li:hover:after{
+    
+}
+.selectContainer ul.dis{display:block!important;} 
+.selectContainer ul.undis{display:none !important;} 
+.zIndex{z-index:10000!important} 
+.selectContainer .gray{}
+/**password**/
+#pwrequired{
+	position:absolute;
+	width:400px;
+	top:30%;
+	left:410px;
+	background:#fff;
+	z-index:10;
+	display:none;
+}
+#pwrequired form{
+	margin:40px 50px;
+}
+#pwrequired form p:last-child{
+	text-align:right;
+}
+#pwrequired form p:last-child a{
+	margin-right:10px;
+	color: #666;
+	border-color:#666;
+}
+.note:before{
+	left:0;
+	top:0;
+}
+.note{
+	padding-left:40px;
+	position:relative;
+}
+#password{
+	padding:0 20px;
+	line-height:28px;
+	width:180px;
+}
+input:disabled{
+	color:#b2b2b2;
+	border-color:#b2b2b2;
+}
+#pwrequired form p{
+	margin:30px 0;
+}
+#navigation li{
+	position:relative;
+}
+#navigation li.current a{
+	color:#333;
+}
+#navigation>li.current:after{
+	content:"";
+	position:absolute;
+	left:160px;
+	top:-10px;
+	width:0;
+	height:0;
+	border:20px solid transparent;
+	border-bottom:30px solid #eee;
+	transform:rotate(10deg);
+}
+@media screen and (max-width:960px){
+	body{
+		background-image: -moz-linear-gradient(top , #79c597, #a7bbcf);
+		background-image: -webkit-gradient(linear, 50% 0%, 50% 100%, from(#79c597), to(#a7bbcf));
+		background-image: -o-linear-gradient(top , #79c597, #a7bbcf);
+		background-size:100% 100%;
+	}
+	#header{
+		background:transparent;
+		width:100%;
+		height:40px;
+		text-align:center;
+	}
+	#header ul{
+		margin:20px 0 10px;
+	}
+	h1{
+		display:none;
+	}
+	#header a span{
+		display:none;
+	}
+	#header ul li{
+		float:left;
+		width:20%;
+	}
+	#header ul li a{
+		display:inline-block;
+		width:36px;
+		height:36px;
+		background-size:auto 36px;
+	}
+	#link-wifilist{
+		background:url(../images/m-icon.png) 21px no-repeat;
+	}
+	#link-mywifi{
+		background:url(../images/m-icon.png) -109px no-repeat;
+	}
+	#link-setting{
+		background:url(../images/m-icon.png) -244px no-repeat;
+	}
+	#advance-setting{
+		background:url(../images/m-icon.png) -244px no-repeat;
+	}
+	article{
+		width:90%;
+		height:550px;
+		min-width:330px;
+		margin-left:5%;
+		margin-top:80px;
+	}
+
+	#pwrequired{
+		left:50%;
+		margin-left:-200px;
+	}
+	.connected{
+		position:absolute;
+		right:0;
+		bottom:8px;
+	}
+	.wifilist ul, .mywifi ul{
+		height:320px;
+	}
+	.listhead p:after{
+		background:none;
+		width:0;
+	}
+	.searchwifi{
+		margin-bottom:10px;
+	}
+	.searchwifi input{
+		width:60%;
+	}
+	.wifilist>p{
+		position:absolute;
+		top:-24px;
+	}
+	#navigation li.current:after{
+		content:"";
+		position:absolute;
+		left:160px;
+		top:-10px;
+		width:0;
+		height:0;
+		border:0 !important;
+	}
+}

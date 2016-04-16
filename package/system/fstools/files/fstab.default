@@ -1,0 +1,20 @@
+[ ! -f /etc/config/fstab ] && {
+	block detect > /etc/config/fstab
+
+cat << EOF >> /etc/config/fstab
+config mount
+    option fstype 'vfat'
+    option enabled '1'
+    option enabled_fsck '1'
+    option target '/mnt/sda1'
+    option device '/dev/sda1'
+
+config mount
+    option fstype 'vfat'
+    option enabled '1'
+    option enabled_fsck '1'
+    option target '/mnt/sdb1'
+    option device '/dev/sdb1'
+EOF
+
+}
