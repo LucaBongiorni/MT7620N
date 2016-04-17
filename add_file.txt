@@ -12,4 +12,6 @@ test --no-ff
 
 test --no-ff log
 
+modify bi issue-101
+
 I'm devoloping my program.
