@@ -9,3 +9,5 @@ test branch dev
 Modify simple && quickly.
 
 test --no-ff
+
+test --no-ff log
