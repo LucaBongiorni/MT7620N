@@ -6,4 +6,4 @@ test stage
 
 test branch dev
 
-Modify simple & quickly.
+Modify simple && quickly.
