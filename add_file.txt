@@ -7,3 +7,5 @@ test stage
 test branch dev
 
 Modify simple && quickly.
+
+test --no-ff
