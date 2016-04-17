@@ -1,3 +1,0 @@
-config control 'system'
-	option enable '1'
-

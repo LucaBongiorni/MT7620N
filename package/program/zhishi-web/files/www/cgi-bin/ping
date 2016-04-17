@@ -1,8 +1,0 @@
-#!/bin/sh
-
-
-m=${QUERY_STRING#*=}
-echo "Content-Type: application/json"
-echo ""
-echo "pingback(\"hello iamreadybabe\");"
-
