@@ -1,3 +1,0 @@
-test add file to git.
-
-test diff file.
