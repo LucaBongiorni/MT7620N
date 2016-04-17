@@ -1,3 +1,5 @@
 test add file
 
 test diff file
+
+test stage
